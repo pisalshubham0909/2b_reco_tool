@@ -488,13 +488,13 @@ def export_reco_to_excel(df_reco, df_supplier, summary_stats):
         # Reorder columns to make it extremely clear (Status, Remarks, Law Remarks first)
         ordered_cols = [
             'reco_status', 'itc_action', 'remarks', 'gst_law_remark',
-            'books_gstin', 'books_supplier_name', 'books_doc_num', 'books_doc_date', 'books_doc_type',
-            'books_taxable_val', 'books_igst', 'books_cgst', 'books_sgst', 'books_cess', 'books_total_val',
-            'books_pos', 'books_rchrg', 'books_pr_period',
             'gstr2b_gstin', 'gstr2b_supplier_name', 'gstr2b_doc_num', 'gstr2b_doc_date', 'gstr2b_doc_type',
             'gstr2b_taxable_val', 'gstr2b_igst', 'gstr2b_cgst', 'gstr2b_sgst', 'gstr2b_cess', 'gstr2b_total_val',
             'gstr2b_pos', 'gstr2b_rchrg', 'gstr2b_itc_eligibility', 'gstr2b_filing_date', 'gstr2b_gstr3b_status',
             'gstr2b_section', 'gstr2b_rtn_period', 'gstr2b_source_file',
+            'books_gstin', 'books_supplier_name', 'books_doc_num', 'books_doc_date', 'books_doc_type',
+            'books_taxable_val', 'books_igst', 'books_cgst', 'books_sgst', 'books_cess', 'books_total_val',
+            'books_pos', 'books_rchrg', 'books_pr_period',
             'taxable_val_diff', 'igst_diff', 'cgst_diff', 'sgst_diff', 'cess_diff', 'days_diff'
         ]
         
@@ -929,28 +929,83 @@ if not gstr2b_df.empty or not books_df.empty:
                 st.dataframe(gstr2b_df.head(10), use_container_width=True)
 
 # Reconciliation Trigger
-if not gstr2b_df.empty and not books_df.empty:
+has_gstr2b = not gstr2b_df.empty or bool(gstr2b_files)
+has_books = not books_df.empty or bool(books_files)
+
+if has_gstr2b and has_books:
     st.markdown("---")
     st.subheader("🏁 Run Reconciliation Engine")
     
     if st.button("Run Reconciliation", type="primary", use_container_width=True):
         with st.spinner("Executing smart matching engine (analyzing exact match, tolerances, amendments, fuzzy logic, RCM, SEZ, and ISD)..."):
             try:
-                df_reco = reconcile_data(
-                    books_df, 
-                    gstr2b_df, 
-                    val_tolerance=val_tol, 
-                    date_tolerance_days=date_tol, 
-                    fuzzy_threshold=fuzzy_tol,
-                    tax_tolerance=tax_tol
-                )
-                df_supplier = generate_supplier_summary(df_reco)
+                # Fallback: Auto-parse GSTR-2B if files are uploaded but not explicitly loaded
+                if gstr2b_df.empty and gstr2b_files:
+                    dfs = []
+                    for file in gstr2b_files:
+                        file.seek(0)
+                        content = file.read().decode('utf-8')
+                        df = parse_gstr2b_json(content, file.name)
+                        dfs.append(df)
+                    if dfs:
+                        gstr2b_df = pd.concat(dfs, ignore_index=True)
+                        st.session_state['gstr2b_df_parsed'] = gstr2b_df
+                        st.session_state['gstr2b_files_sigs'] = uploaded_g2b_sigs
                 
-                # Save in session state
-                st.session_state['reco_results'] = df_reco
-                st.session_state['supplier_results'] = df_supplier
-                st.session_state['reco_executed'] = True
-                st.success("Reconciliation complete!")
+                # Fallback: Auto-parse Purchase Register if files are uploaded but not explicitly loaded
+                if books_df.empty and books_files:
+                    books_dfs = []
+                    for file in books_files:
+                        file.seek(0)
+                        # Build col_mapping dynamically from st.session_state values
+                        col_mapping = {}
+                        for idx, (field_id, label, is_required) in enumerate(fields_meta):
+                            sel = st.session_state.get(f"col_map_{field_id}", "[Not Selected]")
+                            if sel != "[Not Selected]":
+                                col_mapping[field_id] = sel
+                        
+                        cur_sheet = selected_sheet
+                        if file.name.lower().endswith(('.xlsx', '.xlsm', '.xls')):
+                            if file.name.lower().endswith('.xls'):
+                                xl = pd.ExcelFile(file)
+                                file_sheets = xl.sheet_names
+                            else:
+                                wb = load_workbook(file, read_only=True)
+                                file_sheets = wb.sheetnames
+                                wb.close()
+                            if selected_sheet not in file_sheets:
+                                cur_sheet = file_sheets[0] if file_sheets else 0
+                                
+                        parsed_df = parse_purchase_register(
+                            file, 
+                            col_mapping, 
+                            sheet_name=cur_sheet, 
+                            credit_note_convention=cn_convention
+                        )
+                        parsed_df['books_source_file'] = file.name
+                        books_dfs.append(parsed_df)
+                    if books_dfs:
+                        books_df = pd.concat(books_dfs, ignore_index=True)
+                        st.session_state['books_df_parsed'] = books_df
+
+                if gstr2b_df.empty or books_df.empty:
+                    st.error("Cannot run reconciliation: One of the sources has no parsed documents. Please verify your files.")
+                else:
+                    df_reco = reconcile_data(
+                        books_df, 
+                        gstr2b_df, 
+                        val_tolerance=val_tol, 
+                        date_tolerance_days=date_tol, 
+                        fuzzy_threshold=fuzzy_tol,
+                        tax_tolerance=tax_tol
+                    )
+                    df_supplier = generate_supplier_summary(df_reco)
+                    
+                    # Save in session state
+                    st.session_state['reco_results'] = df_reco
+                    st.session_state['supplier_results'] = df_supplier
+                    st.session_state['reco_executed'] = True
+                    st.success("Reconciliation complete!")
             except Exception as e:
                 st.error(f"Failed during reconciliation process: {str(e)}")
 
@@ -1182,20 +1237,20 @@ if 'reco_executed' in st.session_state and st.session_state['reco_executed']:
                     col_order_list.append('gst_law_remark')
                     
                 col_order_list.extend([
-                    'books_gstin', 'books_supplier_name', 'books_doc_num', 'books_doc_date', 
-                    'books_taxable_val', 'books_igst', 'books_cgst', 'books_sgst', 'books_cess', 'books_total_val'
-                ])
-                
-                if show_compliance_cols:
-                    col_order_list.extend(['books_pos', 'books_rchrg', 'books_pr_period'])
-                    
-                col_order_list.extend([
                     'gstr2b_gstin', 'gstr2b_supplier_name', 'gstr2b_doc_num', 'gstr2b_doc_date', 
                     'gstr2b_taxable_val', 'gstr2b_igst', 'gstr2b_cgst', 'gstr2b_sgst', 'gstr2b_cess', 'gstr2b_total_val'
                 ])
                 
                 if show_compliance_cols:
                     col_order_list.extend(['gstr2b_pos', 'gstr2b_rchrg', 'gstr2b_itc_eligibility', 'gstr2b_filing_date', 'gstr2b_gstr3b_status', 'gstr2b_section'])
+                    
+                col_order_list.extend([
+                    'books_gstin', 'books_supplier_name', 'books_doc_num', 'books_doc_date', 
+                    'books_taxable_val', 'books_igst', 'books_cgst', 'books_sgst', 'books_cess', 'books_total_val'
+                ])
+                
+                if show_compliance_cols:
+                    col_order_list.extend(['books_pos', 'books_rchrg', 'books_pr_period'])
                     
                 col_order_list.extend([
                     'taxable_val_diff', 'igst_diff', 'cgst_diff', 'sgst_diff', 'cess_diff', 'days_diff'
