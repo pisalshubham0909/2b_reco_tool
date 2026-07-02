@@ -724,15 +724,30 @@ else:
                 st.error(f"Error parsing GSTR-2B file {file_name}: {str(e)}")
         if dfs:
             gstr2b_df = pd.concat(dfs, ignore_index=True)
-            st.session_state['gstr2b_df_parsed'] = gstr2b_df
-            st.session_state['gstr2b_files_sigs'] = uploaded_g2b_sigs
-            st.success(f"Successfully parsed {len(gstr2b_files)} GSTR-2B JSON file(s) ({len(gstr2b_df)} total records).")
-            # Clear reconciliation state to force recalculation on new data
-            st.session_state['reco_executed'] = False
-            if 'reco_results' in st.session_state:
-                del st.session_state['reco_results']
-            if 'supplier_results' in st.session_state:
-                del st.session_state['supplier_results']
+            if gstr2b_df.empty:
+                st.warning("⚠️ Uploaded GSTR-2B JSON parsed successfully but yielded 0 document records. Please check if this is a valid GSTR-2B statement.")
+                # Run diagnostic check to display JSON keys to the user
+                for file in gstr2b_files:
+                    file.seek(0)
+                    try:
+                        data = json.loads(file.read().decode('utf-8'))
+                        if isinstance(data, str):
+                            data = json.loads(data)
+                        st.info(f"🔍 Diagnostic for `{file.name}`: Found root keys: {list(data.keys())}")
+                        if 'data' in data and isinstance(data['data'], dict):
+                            st.info(f"🔍 Diagnostic nested `data` keys: {list(data['data'].keys())}")
+                    except Exception:
+                        pass
+            else:
+                st.session_state['gstr2b_df_parsed'] = gstr2b_df
+                st.session_state['gstr2b_files_sigs'] = uploaded_g2b_sigs
+                st.success(f"Successfully parsed {len(gstr2b_files)} GSTR-2B JSON file(s) ({len(gstr2b_df)} total records).")
+                # Clear reconciliation state to force recalculation on new data
+                st.session_state['reco_executed'] = False
+                if 'reco_results' in st.session_state:
+                    del st.session_state['reco_results']
+                if 'supplier_results' in st.session_state:
+                    del st.session_state['supplier_results']
     elif 'gstr2b_df_parsed' in st.session_state:
         gstr2b_df = st.session_state['gstr2b_df_parsed']
         
