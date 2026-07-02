@@ -172,6 +172,31 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             return [item for item in doc_list if isinstance(item, dict)]
         return []
 
+    # Helper function to extract tax values from items robustly, checking 'itm_det' and synonyms
+    def extract_tax_from_items(items):
+        txval_sum = 0.0
+        igst_sum = 0.0
+        cgst_sum = 0.0
+        sgst_sum = 0.0
+        cess_sum = 0.0
+        if not items:
+            return txval_sum, igst_sum, cgst_sum, sgst_sum, cess_sum
+            
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            det = item.get('itm_det')
+            if not isinstance(det, dict):
+                det = item
+                
+            txval_sum += float(det.get('txval') or 0.0)
+            igst_sum += float(det.get('iamt') or det.get('igst') or 0.0)
+            cgst_sum += float(det.get('camt') or det.get('cgst') or 0.0)
+            sgst_sum += float(det.get('samt') or det.get('sgst') or 0.0)
+            cess_sum += float(det.get('csamt') or det.get('cess') or 0.0)
+            
+        return txval_sum, igst_sum, cgst_sum, sgst_sum, cess_sum
+
     # 1. Parse B2B Invoices
     b2b_list = get_json_section(data, 'b2b')
     for supplier in b2b_list:
@@ -190,11 +215,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             gstr3b_status = inv.get('g3bfil') or inv.get('g3bfilingstatus') or inv.get('g3bstatus') or 'N'
             
             items = inv.get('items', [])
-            txval = sum(float(item.get('txval', 0.0)) for item in items)
-            igst = sum(float(item.get('igst', 0.0)) for item in items)
-            cgst = sum(float(item.get('cgst', 0.0)) for item in items)
-            sgst = sum(float(item.get('sgst', 0.0)) for item in items)
-            cess = sum(float(item.get('cess', 0.0)) for item in items)
+            txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             documents.append({
                 'supplier_gstin': ctin,
@@ -243,11 +264,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             gstr3b_status = inv.get('g3bfil') or inv.get('g3bfilingstatus') or inv.get('g3bstatus') or 'N'
             
             items = inv.get('items', [])
-            txval = sum(float(item.get('txval', 0.0)) for item in items)
-            igst = sum(float(item.get('igst', 0.0)) for item in items)
-            cgst = sum(float(item.get('cgst', 0.0)) for item in items)
-            sgst = sum(float(item.get('sgst', 0.0)) for item in items)
-            cess = sum(float(item.get('cess', 0.0)) for item in items)
+            txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             documents.append({
                 'supplier_gstin': ctin,
@@ -295,11 +312,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             gstr3b_status = nt.get('g3bfil') or nt.get('g3bfilingstatus') or nt.get('g3bstatus') or 'N'
             
             items = nt.get('items', [])
-            txval = sum(float(item.get('txval', 0.0)) for item in items)
-            igst = sum(float(item.get('igst', 0.0)) for item in items)
-            cgst = sum(float(item.get('cgst', 0.0)) for item in items)
-            sgst = sum(float(item.get('sgst', 0.0)) for item in items)
-            cess = sum(float(item.get('cess', 0.0)) for item in items)
+            txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             # Credit notes represent negative values (ITC reduction)
             sign = -1.0 if nt_ty == 'C' else 1.0
@@ -353,11 +366,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             gstr3b_status = nt.get('g3bfil') or nt.get('g3bfilingstatus') or nt.get('g3bstatus') or 'N'
             
             items = nt.get('items', [])
-            txval = sum(float(item.get('txval', 0.0)) for item in items)
-            igst = sum(float(item.get('igst', 0.0)) for item in items)
-            cgst = sum(float(item.get('cgst', 0.0)) for item in items)
-            sgst = sum(float(item.get('sgst', 0.0)) for item in items)
-            cess = sum(float(item.get('cess', 0.0)) for item in items)
+            txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             sign = -1.0 if nt_ty == 'C' else 1.0
             doc_type = 'CRN' if nt_ty == 'C' else 'DBN'
@@ -407,19 +416,15 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             
             # ISD distribution values may be split rate-wise, sum them up
             items = inv.get('items', [])
-            txval = sum(float(item.get('txval', 0.0)) for item in items)
-            igst = sum(float(item.get('igst', 0.0)) for item in items)
-            cgst = sum(float(item.get('cgst', 0.0)) for item in items)
-            sgst = sum(float(item.get('sgst', 0.0)) for item in items)
-            cess = sum(float(item.get('cess', 0.0)) for item in items)
+            txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             # Fallback if items are missing
             if not items:
-                txval = float(inv.get('txval') or val)
-                igst = float(inv.get('igst') or 0.0)
-                cgst = float(inv.get('cgst') or 0.0)
-                sgst = float(inv.get('sgst') or 0.0)
-                cess = float(inv.get('cess') or 0.0)
+                txval = float(inv.get('txval') or inv.get('tx_val') or val)
+                igst = float(inv.get('igst') or inv.get('iamt') or 0.0)
+                cgst = float(inv.get('cgst') or inv.get('camt') or 0.0)
+                sgst = float(inv.get('sgst') or inv.get('samt') or 0.0)
+                cess = float(inv.get('cess') or inv.get('csamt') or 0.0)
 
             documents.append({
                 'supplier_gstin': ctin,
@@ -467,18 +472,14 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             gstr3b_status = inv.get('g3bfil') or inv.get('g3bfilingstatus') or inv.get('g3bstatus') or 'Y'
             
             items = inv.get('items', [])
-            txval = sum(float(item.get('txval', 0.0)) for item in items)
-            igst = sum(float(item.get('igst', 0.0)) for item in items)
-            cgst = sum(float(item.get('cgst', 0.0)) for item in items)
-            sgst = sum(float(item.get('sgst', 0.0)) for item in items)
-            cess = sum(float(item.get('cess', 0.0)) for item in items)
+            txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             if not items:
-                txval = float(inv.get('txval') or val)
-                igst = float(inv.get('igst') or 0.0)
-                cgst = float(inv.get('cgst') or 0.0)
-                sgst = float(inv.get('sgst') or 0.0)
-                cess = float(inv.get('cess') or 0.0)
+                txval = float(inv.get('txval') or inv.get('tx_val') or val)
+                igst = float(inv.get('igst') or inv.get('iamt') or 0.0)
+                cgst = float(inv.get('cgst') or inv.get('camt') or 0.0)
+                sgst = float(inv.get('sgst') or inv.get('samt') or 0.0)
+                cess = float(inv.get('cess') or inv.get('csamt') or 0.0)
 
             documents.append({
                 'supplier_gstin': ctin,
@@ -513,9 +514,9 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
         boe_num = str(boe.get('boe_num') or boe.get('boenum') or boe.get('boenm') or '').strip()
         boe_dt = boe.get('boe_dt') or boe.get('boedt')
         val = float(boe.get('boe_val') or boe.get('val', 0.0))
-        txval = float(boe.get('txval', 0.0))
-        igst = float(boe.get('igst', 0.0))
-        cess = float(boe.get('cess', 0.0))
+        txval = float(boe.get('txval') or boe.get('tx_val') or 0.0)
+        igst = float(boe.get('igst') or boe.get('iamt') or 0.0)
+        cess = float(boe.get('cess') or boe.get('csamt') or 0.0)
         itcelg = boe.get('itcelg', 'Y').strip().upper()
         port_cd = boe.get('port_cd') or boe.get('port_code') or 'CUSTOMS'
         
@@ -552,9 +553,9 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
         boe_num = str(boe.get('boe_num') or boe.get('boenum') or boe.get('boenm') or '').strip()
         boe_dt = boe.get('boe_dt') or boe.get('boedt')
         val = float(boe.get('boe_val') or boe.get('val', 0.0))
-        txval = float(boe.get('txval', 0.0))
-        igst = float(boe.get('igst', 0.0))
-        cess = float(boe.get('cess', 0.0))
+        txval = float(boe.get('txval') or boe.get('tx_val') or 0.0)
+        igst = float(boe.get('igst') or boe.get('iamt') or 0.0)
+        cess = float(boe.get('cess') or boe.get('csamt') or 0.0)
         itcelg = boe.get('itcelg', 'Y').strip().upper()
         
         # SEZ imports usually have the actual SEZ supplier's GSTIN
