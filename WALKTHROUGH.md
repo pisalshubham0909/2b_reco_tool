@@ -12,6 +12,7 @@ The following files in this directory have been updated:
 *   **GSTR-2B Portal Excel Upload Support**: Configured GSTR-2B file uploader to accept Excel files directly (`type=["xlsx", "xls", "json"]`). Branches the parser to the new Excel scanner or JSON reader based on the file extension.
 *   **Consolidated Exporter (GSTR-2B First)**: Swapped columns layout in the openpyxl exporter. All matched, mismatched, and unmatched records are written to a single worksheet tab named **`Reconciliation Report`** with GSTR-2B columns positioned first on the left side, followed by Books columns on the right.
 *   **Interactive Grid Columns (GSTR-2B First)**: Rearranged the dashboard data table. Portal details (Supplier Name, Cess, Document Value, POS, RCM, filing periods, and ITC eligibility) are rendered first.
+*   **🧹 Complete Removal of Demo/Synthetic Data**: Removed the "Generate & Load Synthetic Data" button and any sandbox parameters to prevent mock data from loading, ensuring only your uploaded files are reconciled.
 *   **🏁 Auto-Parsing Fallback Loader**: If you forget to click the "Load" buttons, clicking "Run Reconciliation" automatically parses and loads uploaded files in the background.
 *   **🧹 Automatic Cache Invalidation**: Wipes cached parsed data and reconciliation results from memory immediately if the set of files in either uploader changes.
 *   **Standard PR Template Exporter**: Added a button to download a standard, pre-formatted Excel template featuring the exact requested columns (Entity GSTIN, Place of Supply, Document Type, Document No, Document Date, Document Value, Transaction Type, Reported Period, Vendor GSTIN, Vendor POS, Taxable Value, GST Rate, IGST, CGST, SGST, Cess Amount, Cess Rate, Remarks, Other Remarks).
@@ -19,7 +20,8 @@ The following files in this directory have been updated:
 *   **Clear Data Option**: Sidebar button to clear session variables and force a clean Streamlit rerun.
 
 ### 2. `parser.py`
-*   **parse_gstr2b_excel (New Excel Parser)**: Direct support for standard Excel files downloaded from the GST Portal. Reads and normalizes B2B, B2BA, CDNR, CDNRA, ISD, IMPG, and IMPGSEZ sheets. Dynamically detects header rows and maps columns case-insensitively using standard keyword groupings.
+*   **parse_gstr2b_excel**: Direct support for standard Excel files downloaded from the GST Portal. Reads and normalizes B2B, B2BA, CDNR, CDNRA, ISD, IMPG, and IMPGSEZ sheets. Dynamically detects header rows and maps columns case-insensitively using standard keyword groupings.
+*   **Formatting-Robust Float Wrapper**: Overrode the built-in `float` function in `parser.py` to automatically strip currency symbols (₹, $), remove formatting commas (e.g. converting `"1,25,000.50"` into `125000.50`), and handle blank cells.
 *   **Case-Insensitive JSON Parser**: Automatically converts all GSTR-2B JSON keys recursively to lowercase (`lowercase_keys_recursive`). This prevents case mismatch issues (such as portal files having `B2B`, `INUM`, or `CTIN` in uppercase) from rendering files empty.
 *   **Streaming Loader**: Processes large spreadsheets row-by-row in `read_only=True` mode using openpyxl, preventing memory crashes on large files.
 *   **Extended GSTR-2B Fields**: Added parsing and normalization logic for ISD distributions (`isd`/`isda` arrays), SEZ imports (`impgsez`), reverse charge (`rchrg`/`rc` flags), Place of Supply (`pos`), GSTR-1 filing date (`flddt`), and GSTR-3B status (`g3bfil`).
@@ -53,6 +55,5 @@ The following files in this directory have been updated:
    * **GSTR-2B**: Upload one or multiple official **Excel (.xlsx, .xls)** or **JSON (.json)** files downloaded from the GST Portal.
    * **Purchase Register**: Upload one or multiple Excel (`.xlsx`, `.xls`) or CSV files at the same time.
    * **PR Template**: Click **"Download PR Template"** to download the standard layout for reference.
-   * **Sandbox**: Click **"Generate & Load Synthetic Data"** in the sidebar to load mock datasets.
 
 4. Click **"Run Reconciliation"** to view interactive KPI charts, download the consolidated report, and analyze status remarks.

@@ -649,26 +649,8 @@ with st.sidebar:
         help="Upload one or multiple Purchase Register sheets."
     )
     
-    # Sandbox Testing Button
-    st.markdown("---")
-    st.subheader("💡 Sandbox Testing")
-    if st.button("Generate & Load Synthetic Data"):
-        json_content, df_books_synth = get_synthetic_data()
-        st.session_state['synth_json'] = json_content
-        st.session_state['synth_books'] = df_books_synth
-        st.session_state['loaded_synth'] = True
-        st.session_state['sandbox_success_msg'] = "Loaded GSTR-2B JSON and Purchase Register mock datasets featuring ISD, RCM, SEZ, Late, and Blocked ITC entries."
-        # Clear reconciliation state to force recalculation on new data
-        st.session_state['reco_executed'] = False
-        if 'reco_results' in st.session_state:
-            del st.session_state['reco_results']
-        if 'supplier_results' in st.session_state:
-            del st.session_state['supplier_results']
-        st.rerun()
-
-# State initialization
-if 'loaded_synth' not in st.session_state:
-    st.session_state['loaded_synth'] = False
+    # Sidebar layout complete
+    pass
 
 # Render success messages on page load after rerun
 if 'gstr2b_success_msg' in st.session_state:
@@ -679,107 +661,71 @@ if 'books_success_msg' in st.session_state:
     st.success(st.session_state['books_success_msg'])
     del st.session_state['books_success_msg']
 
-if 'sandbox_success_msg' in st.session_state:
-    st.success(st.session_state['sandbox_success_msg'])
-    del st.session_state['sandbox_success_msg']
-
 # Load data logic
 gstr2b_df = pd.DataFrame()
 books_df = pd.DataFrame()
 sheet_names = []
 selected_sheet = None
 
-# If user loaded synthetic data
-if st.session_state['loaded_synth']:
-    gstr2b_df = parse_gstr2b_json(json.dumps(st.session_state['synth_json']), "sample_gstr2b.json")
-    
-    col_mapping = {
-        'supplier_gstin': 'Supplier GSTIN',
-        'supplier_name': 'Supplier Name',
-        'doc_num': 'Invoice Number',
-        'doc_date': 'Invoice Date',
-        'taxable_val': 'Taxable Value',
-        'igst': 'IGST',
-        'cgst': 'CGST',
-        'sgst': 'SGST',
-        'doc_type': 'Voucher Type',
-        'pos': 'POS',
-        'rchrg': 'RCM',
-        'pr_period': 'PR Period'
-    }
-    
-    synth_books_df = st.session_state['synth_books'].copy()
-    if 'Cess' not in synth_books_df.columns:
-        synth_books_df['Cess'] = 0.0
-    synth_books_df['PR Period'] = '032026'
-    
-    books_df = parse_purchase_register(
-        synth_books_df, 
-        col_mapping, 
-        credit_note_convention=cn_convention
-    )
-    st.info("⚡ Active Source: Sandbox Synthetic Datasets (ISD, SEZ, RCM, unfiled G3B return cases active)")
-    
-else:
-    # 1. Parse Uploaded GSTR-2B JSON
-    uploaded_g2b_sigs = [(f.name, f.size) for f in gstr2b_files] if gstr2b_files else []
-    cached_g2b_sigs = st.session_state.get('gstr2b_files_sigs', [])
-    
-    # Detect file list change and invalidate cache immediately to prevent showing old data
-    if gstr2b_files and uploaded_g2b_sigs != cached_g2b_sigs:
-        if 'gstr2b_df_parsed' in st.session_state:
-            del st.session_state['gstr2b_df_parsed']
-        st.session_state['reco_executed'] = False
-        if 'reco_results' in st.session_state:
-            del st.session_state['reco_results']
-        if 'supplier_results' in st.session_state:
-            del st.session_state['supplier_results']
-            
-    if gstr2b_files:
-        st.markdown("### 🌐 GSTR-2B Statements")
-        st.info(f"Selected {len(gstr2b_files)} portal statement file(s). Click below to parse and load them into memory.")
-        if st.button("Load GSTR-2B Data"):
-            dfs = []
-            for file in gstr2b_files:
-                file_name = file.name
-                try:
-                    # Read content: branch to Excel parser or JSON parser based on extension
-                    if file_name.lower().endswith(('.xlsx', '.xlsm', '.xls')):
-                        df = parse_gstr2b_excel(file)
-                    else:
-                        content = file.read().decode('utf-8')
-                        df = parse_gstr2b_json(content, file_name)
-                    dfs.append(df)
-                except Exception as e:
-                    st.error(f"Error parsing GSTR-2B file {file_name}: {str(e)}")
-            if dfs:
-                gstr2b_df = pd.concat(dfs, ignore_index=True)
-                if gstr2b_df.empty:
-                    st.warning("⚠️ Uploaded GSTR-2B statement parsed successfully but yielded 0 document records. Please check if this is a valid GSTR-2B statement.")
-                    # Run diagnostic check to display JSON keys to the user
-                    for file in gstr2b_files:
-                        file.seek(0)
-                        try:
-                            data = json.loads(file.read().decode('utf-8'))
-                            if isinstance(data, str):
-                                data = json.loads(data)
-                            st.info(f"🔍 Diagnostic for `{file.name}`: Found root keys: {list(data.keys())}")
-                            if 'data' in data and isinstance(data['data'], dict):
-                                st.info(f"🔍 Diagnostic nested `data` keys: {list(data['data'].keys())}")
-                        except Exception:
-                            pass
+# 1. Parse Uploaded GSTR-2B Statement
+uploaded_g2b_sigs = [(f.name, f.size) for f in gstr2b_files] if gstr2b_files else []
+cached_g2b_sigs = st.session_state.get('gstr2b_files_sigs', [])
+
+# Detect file list change and invalidate cache immediately to prevent showing old data
+if gstr2b_files and uploaded_g2b_sigs != cached_g2b_sigs:
+    if 'gstr2b_df_parsed' in st.session_state:
+        del st.session_state['gstr2b_df_parsed']
+    st.session_state['reco_executed'] = False
+    if 'reco_results' in st.session_state:
+        del st.session_state['reco_results']
+    if 'supplier_results' in st.session_state:
+        del st.session_state['supplier_results']
+        
+if gstr2b_files:
+    st.markdown("### 🌐 GSTR-2B Statements")
+    st.info(f"Selected {len(gstr2b_files)} portal statement file(s). Click below to parse and load them into memory.")
+    if st.button("Load GSTR-2B Data"):
+        dfs = []
+        for file in gstr2b_files:
+            file_name = file.name
+            try:
+                # Read content: branch to Excel parser or JSON parser based on extension
+                if file_name.lower().endswith(('.xlsx', '.xlsm', '.xls')):
+                    df = parse_gstr2b_excel(file)
                 else:
-                    st.session_state['gstr2b_df_parsed'] = gstr2b_df
-                    st.session_state['gstr2b_files_sigs'] = uploaded_g2b_sigs
-                    st.session_state['gstr2b_success_msg'] = f"Successfully loaded {len(gstr2b_files)} GSTR-2B JSON file(s) ({len(gstr2b_df)} total records)."
-                    # Clear reconciliation state to force recalculation on new data
-                    st.session_state['reco_executed'] = False
-                    if 'reco_results' in st.session_state:
-                        del st.session_state['reco_results']
-                    if 'supplier_results' in st.session_state:
-                        del st.session_state['supplier_results']
-                    st.rerun()
-                        
+                    content = file.read().decode('utf-8')
+                    df = parse_gstr2b_json(content, file_name)
+                dfs.append(df)
+            except Exception as e:
+                st.error(f"Error parsing GSTR-2B file {file_name}: {str(e)}")
+        if dfs:
+            gstr2b_df = pd.concat(dfs, ignore_index=True)
+            if gstr2b_df.empty:
+                st.warning("⚠️ Uploaded GSTR-2B statement parsed successfully but yielded 0 document records. Please check if this is a valid GSTR-2B statement.")
+                # Run diagnostic check to display JSON keys to the user
+                for file in gstr2b_files:
+                    file.seek(0)
+                    try:
+                        data = json.loads(file.read().decode('utf-8'))
+                        if isinstance(data, str):
+                            data = json.loads(data)
+                        st.info(f"🔍 Diagnostic for `{file.name}`: Found root keys: {list(data.keys())}")
+                        if 'data' in data and isinstance(data['data'], dict):
+                            st.info(f"🔍 Diagnostic nested `data` keys: {list(data['data'].keys())}")
+                    except Exception:
+                        pass
+            else:
+                st.session_state['gstr2b_df_parsed'] = gstr2b_df
+                st.session_state['gstr2b_files_sigs'] = uploaded_g2b_sigs
+                st.session_state['gstr2b_success_msg'] = f"Successfully loaded {len(gstr2b_files)} GSTR-2B JSON file(s) ({len(gstr2b_df)} total records)."
+                # Clear reconciliation state to force recalculation on new data
+                st.session_state['reco_executed'] = False
+                if 'reco_results' in st.session_state:
+                    del st.session_state['reco_results']
+                if 'supplier_results' in st.session_state:
+                    del st.session_state['supplier_results']
+                st.rerun()
+                    
     # Load GSTR-2B from session state if already parsed
     if 'gstr2b_df_parsed' in st.session_state:
         gstr2b_df = st.session_state['gstr2b_df_parsed']

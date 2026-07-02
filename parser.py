@@ -5,7 +5,23 @@ import numpy as np
 import gc
 from openpyxl import load_workbook
 
+# Shadow built-in float in module scope to handle currency symbols, commas, and malformed inputs robustly
+_builtin_float = float
+def float(val):
+    if val is None:
+        return 0.0
+    if isinstance(val, (int, _builtin_float)):
+        return _builtin_float(val)
+    try:
+        val_str = str(val).replace(',', '').replace('₹', '').replace('$', '').strip()
+        if not val_str or val_str.lower() in ('none', 'nan', 'null', ''):
+            return 0.0
+        return _builtin_float(val_str)
+    except Exception:
+        return 0.0
+
 def get_json_section(data, key):
+
     """
     Search recursively or through common GSTR-2B JSON wrappers for a specific key.
     """
