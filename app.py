@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import io
 import json
-from parser import parse_gstr2b_json, parse_purchase_register, auto_detect_columns, clean_invoice_number
+from parser import parse_gstr2b_json, parse_gstr2b_excel, parse_purchase_register, auto_detect_columns, clean_invoice_number
 from engine import reconcile_data, generate_supplier_summary
 import plotly.express as px
 import plotly.graph_objects as go
@@ -635,10 +635,10 @@ with st.sidebar:
     
     # GSTR-2B File upload (1GB upload limit enabled)
     gstr2b_files = st.file_uploader(
-        "GSTR-2B JSON Files (Up to 1GB)", 
-        type="json", 
+        "GSTR-2B Portal Statements (Excel / JSON - Up to 1GB)", 
+        type=["xlsx", "xls", "json"], 
         accept_multiple_files=True,
-        help="Upload one or multiple GSTR-2B JSON statements. Supports huge size files."
+        help="Upload one or multiple GSTR-2B Excel or JSON files downloaded directly from the GST Portal."
     )
     
     # Books File upload
@@ -737,22 +737,25 @@ else:
             
     if gstr2b_files:
         st.markdown("### 🌐 GSTR-2B Statements")
-        st.info(f"Selected {len(gstr2b_files)} JSON statement(s). Click below to parse and load them into memory.")
+        st.info(f"Selected {len(gstr2b_files)} portal statement file(s). Click below to parse and load them into memory.")
         if st.button("Load GSTR-2B Data"):
             dfs = []
             for file in gstr2b_files:
                 file_name = file.name
                 try:
-                    # Read content
-                    content = file.read().decode('utf-8')
-                    df = parse_gstr2b_json(content, file_name)
+                    # Read content: branch to Excel parser or JSON parser based on extension
+                    if file_name.lower().endswith(('.xlsx', '.xlsm', '.xls')):
+                        df = parse_gstr2b_excel(file)
+                    else:
+                        content = file.read().decode('utf-8')
+                        df = parse_gstr2b_json(content, file_name)
                     dfs.append(df)
                 except Exception as e:
                     st.error(f"Error parsing GSTR-2B file {file_name}: {str(e)}")
             if dfs:
                 gstr2b_df = pd.concat(dfs, ignore_index=True)
                 if gstr2b_df.empty:
-                    st.warning("⚠️ Uploaded GSTR-2B JSON parsed successfully but yielded 0 document records. Please check if this is a valid GSTR-2B statement.")
+                    st.warning("⚠️ Uploaded GSTR-2B statement parsed successfully but yielded 0 document records. Please check if this is a valid GSTR-2B statement.")
                     # Run diagnostic check to display JSON keys to the user
                     for file in gstr2b_files:
                         file.seek(0)
@@ -987,8 +990,11 @@ if has_gstr2b and has_books:
                     dfs = []
                     for file in gstr2b_files:
                         file.seek(0)
-                        content = file.read().decode('utf-8')
-                        df = parse_gstr2b_json(content, file.name)
+                        if file.name.lower().endswith(('.xlsx', '.xlsm', '.xls')):
+                            df = parse_gstr2b_excel(file)
+                        else:
+                            content = file.read().decode('utf-8')
+                            df = parse_gstr2b_json(content, file.name)
                         dfs.append(df)
                     if dfs:
                         gstr2b_df = pd.concat(dfs, ignore_index=True)

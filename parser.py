@@ -845,3 +845,161 @@ def auto_detect_columns(columns):
                 break
                 
     return detected
+
+def parse_gstr2b_excel(file_path_or_obj):
+    """
+    Parses a GSTR-2B Excel spreadsheet directly downloaded from the GST Portal.
+    Extracts records from B2B, B2BA, CDNR, CDNRA, ISD, IMPG, and IMPGSEZ sheets.
+    """
+    wb = load_workbook(file_path_or_obj, read_only=True, data_only=True)
+    documents = []
+    
+    # Configuration for each worksheet type
+    sheet_configs = {
+        'b2b': {'doc_type': 'INV', 'section': 'B2B Invoices', 'is_cdnr': False},
+        'b2ba': {'doc_type': 'INV', 'section': 'B2B Amendments', 'is_cdnr': False},
+        'cdnr': {'section': 'Credit/Debit Notes', 'is_cdnr': True},
+        'cdnra': {'section': 'Amended Credit/Debit Notes', 'is_cdnr': True},
+        'isd': {'doc_type': 'ISD', 'section': 'ISD Invoices', 'is_cdnr': False},
+        'impg': {'doc_type': 'IMPG', 'section': 'Import of Goods', 'is_cdnr': False},
+        'impgsez': {'doc_type': 'IMPG', 'section': 'SEZ Import of Goods', 'is_cdnr': False}
+    }
+    
+    # Case-insensitive worksheet names index map
+    sheet_names_lower = {name.lower().strip(): name for name in wb.sheetnames}
+    
+    for key, config in sheet_configs.items():
+        if key in sheet_names_lower:
+            actual_sheet_name = sheet_names_lower[key]
+            ws = wb[actual_sheet_name]
+            
+            # Find the header row by searching first 20 rows
+            header_row_idx = None
+            headers = []
+            row_generator = ws.iter_rows(values_only=True)
+            
+            for r_idx, row in enumerate(row_generator, start=1):
+                if r_idx > 20:
+                    break
+                row_str = [str(x).lower().strip() if x is not None else "" for x in row]
+                if any('gstin' in s or 'invoice number' in s or 'invoice no' in s or 'bill of entry' in s or 'boe no' in s or 'note number' in s or 'note no' in s for s in row_str):
+                    header_row_idx = r_idx
+                    headers = [str(x).strip() for x in row]
+                    break
+            
+            if header_row_idx is None:
+                continue
+                
+            # Iterate rows below header
+            ws_rows = ws.iter_rows(values_only=True)
+            for _ in range(header_row_idx):
+                next(ws_rows, None)
+                
+            for row in ws_rows:
+                # Skip empty or total rows
+                if not row or row[0] is None or str(row[0]).strip().lower() in ('', 'none', 'total', 'grand total'):
+                    continue
+                    
+                row_dict = {}
+                for col_idx, col_name in enumerate(headers):
+                    if col_idx < len(row) and col_name:
+                        row_dict[col_name.lower().strip()] = row[col_idx]
+                        
+                # Extract fields using flexible keyword/substring matches
+                ctin_col = next((k for k in row_dict.keys() if 'gstin' in k or 'supplier gstin' in k), None)
+                ctin = str(row_dict.get(ctin_col or '')).strip().upper() if ctin_col else ''
+                if not ctin or ctin.lower() in ('none', 'total', 'grand total'):
+                    continue
+                    
+                name_col = next((k for k in row_dict.keys() if 'name' in k or 'legal name' in k or 'trade name' in k), None)
+                cname = str(row_dict.get(name_col or '')).strip() if name_col else ''
+                
+                inum_col = next((k for k in row_dict.keys() if 'invoice number' in k or 'invoice no' in k or 'document number' in k or 'document no' in k or 'boe number' in k or 'boe no' in k or 'nt_num' in k or 'note number' in k or 'note no' in k), None)
+                inum = str(row_dict.get(inum_col or '')).strip() if inum_col else ''
+                if not inum or inum.lower() in ('none', ''):
+                    continue
+                    
+                idt_col = next((k for k in row_dict.keys() if 'date' in k or 'idt' in k or 'boe date' in k), None)
+                idt = row_dict.get(idt_col or '') if idt_col else None
+                
+                val_col = next((k for k in row_dict.keys() if 'value' in k or 'invoice value' in k or 'document value' in k or 'boe value' in k), None)
+                val = float(row_dict.get(val_col or 0.0) or 0.0) if val_col else 0.0
+                
+                pos_col = next((k for k in row_dict.keys() if 'place of supply' in k or 'pos' in k), None)
+                pos = str(row_dict.get(pos_col or '')).strip() if pos_col else ''
+                
+                rc_col = next((k for k in row_dict.keys() if 'reverse charge' in k or 'rcm' in k), None)
+                rchrg = str(row_dict.get(rc_col or 'N')).strip().upper() if rc_col else 'N'
+                
+                txval_col = next((k for k in row_dict.keys() if 'taxable value' in k or 'taxable val' in k), None)
+                txval = float(row_dict.get(txval_col or 0.0) or 0.0) if txval_col else 0.0
+                
+                igst_col = next((k for k in row_dict.keys() if 'integrated tax' in k or 'igst' in k or 'integrated' in k), None)
+                igst = float(row_dict.get(igst_col or 0.0) or 0.0) if igst_col else 0.0
+                
+                cgst_col = next((k for k in row_dict.keys() if 'central tax' in k or 'cgst' in k or 'central' in k), None)
+                cgst = float(row_dict.get(cgst_col or 0.0) or 0.0) if cgst_col else 0.0
+                
+                sgst_col = next((k for k in row_dict.keys() if 'state tax' in k or 'sgst' in k or 'state' in k or 'ut tax' in k), None)
+                sgst = float(row_dict.get(sgst_col or 0.0) or 0.0) if sgst_col else 0.0
+                
+                cess_col = next((k for k in row_dict.keys() if 'cess' in k), None)
+                cess = float(row_dict.get(cess_col or 0.0) or 0.0) if cess_col else 0.0
+                
+                itc_col = next((k for k in row_dict.keys() if 'itc eligibility' in k or 'itc availability' in k or 'itc' in k), None)
+                itcelg = str(row_dict.get(itc_col or 'Y')).strip().upper() if itc_col else 'Y'
+                itc_eligibility = 'Eligible' if 'ineligible' not in itcelg.lower() and itcelg in ('Y', 'YES', 'ELIGIBLE') else 'Ineligible'
+                
+                fld_col = next((k for k in row_dict.keys() if 'filing date' in k or 'flddt' in k or 'gstr-1 filing date' in k), None)
+                filing_date = row_dict.get(fld_col or '') if fld_col else ''
+                
+                g3b_col = next((k for k in row_dict.keys() if 'gstr-3b' in k or '3b' in k or 'filing status' in k), None)
+                gstr3b_status = 'Yes' if str(row_dict.get(g3b_col or 'N')).strip().upper() in ('Y', 'YES', 'FILED') else 'No'
+                
+                period_col = next((k for k in row_dict.keys() if 'period' in k or 'rtn_period' in k), None)
+                rtn_period = str(row_dict.get(period_col or '')).strip() if period_col else ''
+                
+                doc_type = config.get('doc_type', 'INV')
+                sign = 1.0
+                
+                if config['is_cdnr']:
+                    ty_col = next((k for k in row_dict.keys() if 'type' in k or 'note type' in k or 'nt_ty' in k), None)
+                    ty = str(row_dict.get(ty_col or '')).strip().upper() if ty_col else ''
+                    if 'credit' in ty.lower() or 'c' in ty.lower():
+                        doc_type = 'CRN'
+                        sign = -1.0
+                    else:
+                        doc_type = 'DBN'
+                        sign = 1.0
+                        
+                documents.append({
+                    'supplier_gstin': ctin,
+                    'supplier_name': cname,
+                    'doc_num': inum,
+                    'clean_doc_num': clean_invoice_number(inum),
+                    'doc_date': parse_date(idt),
+                    'doc_type': doc_type,
+                    'taxable_val': round(txval * sign, 2),
+                    'igst': round(igst * sign, 2),
+                    'cgst': round(cgst * sign, 2),
+                    'sgst': round(sgst * sign, 2),
+                    'cess': round(cess * sign, 2),
+                    'total_val': round(val * sign, 2),
+                    'pos': pos,
+                    'rchrg': 'Yes' if rchrg in ('Y', 'YES') else 'No',
+                    'itc_eligibility': itc_eligibility,
+                    'filing_date': parse_date(filing_date),
+                    'gstr3b_status': gstr3b_status,
+                    'section': config['section'],
+                    'is_amended': 'amendment' in config['section'].lower(),
+                    'original_doc_num': None,
+                    'original_doc_date': None,
+                    'rtn_period': rtn_period,
+                    'source': 'GSTR-2B',
+                    'source_file': getattr(file_path_or_obj, 'name', 'GSTR2B_Portal.xlsx')
+                })
+                
+    wb.close()
+    if not documents:
+        return pd.DataFrame()
+    return pd.DataFrame(documents)
