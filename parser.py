@@ -45,10 +45,16 @@ def clean_invoice_number(inv_no):
     - Strips whitespace.
     - Removes non-alphanumeric characters.
     - Strips leading zeros.
+    - Strips float trailing decimals (.0 / .00).
     """
     if pd.isna(inv_no) or inv_no is None:
         return ""
     inv_str = str(inv_no).strip().upper()
+    # Remove floating point suffix if parsed as float
+    if inv_str.endswith('.0'):
+        inv_str = inv_str[:-2]
+    elif inv_str.endswith('.00'):
+        inv_str = inv_str[:-3]
     # Remove all non-alphanumeric characters (e.g., slash, dash, spaces)
     cleaned = re.sub(r'[^A-Z0-9]', '', inv_str)
     # Strip leading zeros
@@ -374,7 +380,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
                 'doc_num': docnum,
                 'clean_doc_num': clean_invoice_number(docnum),
                 'doc_date': parse_date(docdt),
-                'doc_type': 'INV',
+                'doc_type': 'ISD',
                 'taxable_val': round(txval, 2),
                 'igst': round(igst, 2),
                 'cgst': round(cgst, 2),
@@ -433,7 +439,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
                 'doc_num': docnum,
                 'clean_doc_num': clean_invoice_number(docnum),
                 'doc_date': parse_date(docdt),
-                'doc_type': 'INV',
+                'doc_type': 'ISD',
                 'taxable_val': round(txval, 2),
                 'igst': round(igst, 2),
                 'cgst': round(cgst, 2),
@@ -472,7 +478,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             'doc_num': boe_num,
             'clean_doc_num': clean_invoice_number(boe_num),
             'doc_date': parse_date(boe_dt),
-            'doc_type': 'BOE',
+            'doc_type': 'IMPG',
             'taxable_val': round(txval, 2),
             'igst': round(igst, 2),
             'cgst': 0.0,
@@ -515,7 +521,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             'doc_num': boe_num,
             'clean_doc_num': clean_invoice_number(boe_num),
             'doc_date': parse_date(boe_dt),
-            'doc_type': 'BOE',
+            'doc_type': 'IMPG',
             'taxable_val': round(txval, 2),
             'igst': round(igst, 2),
             'cgst': 0.0,
@@ -705,13 +711,29 @@ def parse_purchase_register(file_path_or_buffer, col_mapping, sheet_name=None, c
         else:
             df[key] = 0.0
 
-    # Determine standard document type (INV, CRN, DBN)
+    # Map PR Period
+    period_col = col_mapping.get('pr_period')
+    if period_col and period_col in df_raw.columns:
+        df['pr_period'] = df_raw[period_col].fillna("").astype(str).str.strip()
+    else:
+        def fallback_period(row):
+            dt = row.get('doc_date')
+            if pd.notna(dt):
+                return dt.strftime('%m%Y')
+            return ""
+        df['pr_period'] = df.apply(fallback_period, axis=1)
+
+    # Determine standard document type (INV, CRN, DBN, IMPG, ISD)
     def determine_doc_type(row):
         t_raw = str(row.get('doc_type_raw', '')).upper()
         if 'CREDIT' in t_raw or 'CRN' in t_raw or 'CN' == t_raw or 'CDN' in t_raw:
             return 'CRN'
         elif 'DEBIT' in t_raw or 'DBN' in t_raw or 'DN' == t_raw:
             return 'DBN'
+        elif 'IMPORT' in t_raw or 'IMPG' in t_raw or 'BOE' in t_raw or 'BILL OF ENTRY' in t_raw:
+            return 'IMPG'
+        elif 'ISD' in t_raw or 'ISDA' in t_raw or 'DISTRIB' in t_raw:
+            return 'ISD'
         elif row.get('taxable_val') < 0:
             return 'CRN'
         return 'INV'
@@ -776,7 +798,8 @@ def auto_detect_columns(columns):
         'total_val': ['total value', 'invoice value', 'total amount', 'inv value', 'bill amount', 'invoice_val', 'val', 'total_amt', 'gross value', 'invoice amount'],
         'doc_type': ['document type', 'doc type', 'voucher type', 'vtype', 'type', 'doc_type', 'voucher name'],
         'pos': ['pos', 'place of supply', 'place_of_supply', 'state code', 'supply state'],
-        'rchrg': ['rchrg', 'reverse charge', 'rcm', 'rc', 'reverse_charge']
+        'rchrg': ['rchrg', 'reverse charge', 'rcm', 'rc', 'reverse_charge'],
+        'pr_period': ['period', 'month', 'return period', 'return_period', 'pr period', 'pr_period', 'rtnprd', 'month/year', 'reco period']
     }
     
     for field, terms in keywords.items():

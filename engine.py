@@ -52,7 +52,7 @@ def generate_gst_law_remark(row, source):
 
     return "Eligible Input Tax Credit (ITC) under Section 16 of CGST Act. Document uploaded and filed by supplier."
 
-def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=7, fuzzy_threshold=85.0):
+def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=7, fuzzy_threshold=85.0, tax_tolerance=10.0):
     """
     Executes a 4-level matching strategy to reconcile Purchase Register and GSTR-2B.
     Optimized to complete in linear O(N) time using hash-map indices.
@@ -79,43 +79,45 @@ def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=
         igst_diff = round((b_row['igst'] - g_row['igst']), 2) if b_row is not None and g_row is not None else np.nan
         cgst_diff = round((b_row['cgst'] - g_row['cgst']), 2) if b_row is not None and g_row is not None else np.nan
         sgst_diff = round((b_row['sgst'] - g_row['sgst']), 2) if b_row is not None and g_row is not None else np.nan
+        cess_diff = round((b_row['cess'] - g_row['cess']), 2) if b_row is not None and g_row is not None else np.nan
         days_diff = calculate_date_difference(b_row['doc_date'], g_row['doc_date']) if b_row is not None and g_row is not None else np.nan
 
         # Generate descriptive remarks
         remarks = ""
-        if status == 'Matched':
-            remarks = "Exact match: Document keys and values reconcile perfectly."
-        elif status == 'Matched (Amended)':
-            remarks = f"Matched via amended document link (Original doc number: {g_row['original_doc_num']})."
-        elif status == 'Fuzzy Match':
-            score_str = match_level.split("Score: ")[-1].replace(")", "") if "Score: " in match_level else "85"
-            remarks = f"Fuzzy match on doc number (Similarity score: {score_str}%). Minor prefix/formatting difference."
-        elif status == 'Only in Books':
+        if status == 'Only in Books':
             remarks = "Only in Books. Document has not been uploaded by supplier to GST Portal. Hold ITC and follow up."
         elif status == 'Only in GSTR-2B':
             remarks = "Only in GSTR-2B. Document filed by supplier but entry is missing in your accounting books."
-        else:
-            # This is a mismatch
+        elif b_row is not None and g_row is not None:
+            # Reconciled record
             reasons = []
-            if abs(taxable_diff) > val_tolerance:
-                reasons.append(f"Taxable value diff ₹{taxable_diff:,.2f} (Books: ₹{b_row['taxable_val']:,.2f}, 2B: ₹{g_row['taxable_val']:,.2f})")
-            if not pd.isna(days_diff) and days_diff > date_tolerance_days:
+            if abs(taxable_diff) > 1.0:
+                reasons.append(f"Taxable value diff Rs.{taxable_diff:,.2f} (Books: Rs.{b_row['taxable_val']:,.2f}, 2B: Rs.{g_row['taxable_val']:,.2f})")
+            if not pd.isna(days_diff) and days_diff > 0:
                 b_date = b_row['doc_date'].strftime('%d-%m-%Y') if not pd.isna(b_row['doc_date']) else "NaT"
                 g_date = g_row['doc_date'].strftime('%d-%m-%Y') if not pd.isna(g_row['doc_date']) else "NaT"
                 reasons.append(f"Date difference of {int(days_diff)} days (Books: {b_date}, GSTR-2B: {g_date})")
+            if b_row['doc_num'] != g_row['doc_num']:
+                reasons.append(f"Invoice number format variance (Books: '{b_row['doc_num']}', GSTR-2B: '{g_row['doc_num']}')")
             
             tax_mismatch_reasons = []
-            if abs(igst_diff) > 1.0:
-                tax_mismatch_reasons.append(f"IGST diff: ₹{igst_diff:,.2f}")
-            if abs(cgst_diff) > 1.0:
-                tax_mismatch_reasons.append(f"CGST diff: ₹{cgst_diff:,.2f}")
-            if abs(sgst_diff) > 1.0:
-                tax_mismatch_reasons.append(f"SGST diff: ₹{sgst_diff:,.2f}")
+            if abs(igst_diff) > tax_tolerance:
+                tax_mismatch_reasons.append(f"IGST diff: Rs.{igst_diff:,.2f}")
+            if abs(cgst_diff) > tax_tolerance:
+                tax_mismatch_reasons.append(f"CGST diff: Rs.{cgst_diff:,.2f}")
+            if abs(sgst_diff) > tax_tolerance:
+                tax_mismatch_reasons.append(f"SGST diff: Rs.{sgst_diff:,.2f}")
+            if abs(cess_diff) > tax_tolerance:
+                tax_mismatch_reasons.append(f"Cess diff: Rs.{cess_diff:,.2f}")
                 
             if tax_mismatch_reasons:
-                reasons.append("Tax values variance (" + ", ".join(tax_mismatch_reasons) + ")")
+                reasons.append("Tax values variance exceeds tolerance (" + ", ".join(tax_mismatch_reasons) + ")")
+                status = "Tax Mismatch"
                 
-            remarks = "Discrepancy: " + "; ".join(reasons)
+            if reasons:
+                remarks = "Matched with warning: " + "; ".join(reasons)
+            else:
+                remarks = "Exact match: Document keys and values reconcile perfectly."
 
         # Determine ITC action
         if status in ('Matched', 'Fuzzy Match', 'Matched (Amended)'):
@@ -123,9 +125,9 @@ def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=
                 itc_action = 'ITC Claimable'
             else:
                 itc_action = 'ITC Blocked (Ineligible)'
-        elif 'Mismatch' in status or 'Discrepancy' in status:
+        elif 'Mismatch' in status or 'Discrepancy' in status or 'Tax Mismatch' in status:
             if g_row['itc_eligibility'] == 'Eligible':
-                if abs(taxable_diff) <= val_tolerance:
+                if abs(taxable_diff) <= 10.0:
                     itc_action = 'ITC Claimable'
                 else:
                     if b_row['taxable_val'] > g_row['taxable_val']:
@@ -164,7 +166,7 @@ def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=
             'books_total_val': b_row['total_val'] if b_row is not None else 0.0,
             'books_pos': b_row['pos'] if b_row is not None else "",
             'books_rchrg': b_row['rchrg'] if b_row is not None else "No",
-            'books_section': b_row['section'] if b_row is not None else "",
+            'books_pr_period': b_row['pr_period'] if b_row is not None else None,
             
             # GSTR-2B fields
             'gstr2b_gstin': g_row['supplier_gstin'] if g_row is not None else None,
@@ -192,6 +194,7 @@ def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=
             'igst_diff': igst_diff,
             'cgst_diff': cgst_diff,
             'sgst_diff': sgst_diff,
+            'cess_diff': cess_diff,
             'days_diff': days_diff
         }
         
@@ -220,7 +223,7 @@ def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=
                 am_key = (g_row['supplier_gstin'], g_row['doc_type'], clean_original)
                 g_by_amended_key[am_key].append(g_row)
 
-    # --- LEVEL 1: Exact Match (GSTIN + Clean Invoice No + Doc Type + Within tolerance) ---
+    # --- LEVEL 1 & 2: Exact Key Match (GSTIN + Clean Invoice No + Doc Type) ---
     for b_row in b_rows:
         b_idx = b_row['books_idx']
         gstin = b_row['supplier_gstin']
@@ -232,54 +235,22 @@ def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=
             
         key = (gstin, doc_type, clean_no)
         candidates = g_by_key.get(key, [])
-        
-        best_candidate = None
-        min_val_diff = float('inf')
-        
-        for g_row in candidates:
-            g_idx = g_row['gstr2b_idx']
-            if g_idx in matched_gstr2b:
-                continue
-                
-            val_diff = abs(b_row['taxable_val'] - g_row['taxable_val'])
-            days_diff = calculate_date_difference(b_row['doc_date'], g_row['doc_date'])
-            
-            if val_diff <= val_tolerance and (pd.isna(days_diff) or days_diff <= date_tolerance_days):
-                if val_diff < min_val_diff:
-                    min_val_diff = val_diff
-                    best_candidate = g_row
-                    
-        if best_candidate is not None:
-            g_idx = best_candidate['gstr2b_idx']
-            matched_books.add(b_idx)
-            matched_gstr2b.add(g_idx)
-            reconciled_rows.append(create_reconciled_row(b_row, best_candidate, 'Matched', 'Level 1: Exact Match'))
-
-    # --- LEVEL 2: Exact Key Match with Date/Value Discrepancy ---
-    for b_row in b_rows:
-        b_idx = b_row['books_idx']
-        if b_idx in matched_books:
-            continue
-            
-        gstin = b_row['supplier_gstin']
-        doc_type = b_row['doc_type']
-        clean_no = b_row['clean_doc_num']
-        
-        if not clean_no:
-            continue
-            
-        key = (gstin, doc_type, clean_no)
-        candidates = g_by_key.get(key, [])
-        
         available_candidates = [g for g in candidates if g['gstr2b_idx'] not in matched_gstr2b]
         
         if available_candidates:
+            # Pick best match by minimum tax difference
             best_candidate = None
-            min_val_diff = float('inf')
+            min_tax_diff = float('inf')
+            
             for g_row in available_candidates:
-                val_diff = abs(b_row['taxable_val'] - g_row['taxable_val'])
-                if val_diff < min_val_diff:
-                    min_val_diff = val_diff
+                tot_tax_diff = (
+                    abs(b_row['igst'] - g_row['igst']) +
+                    abs(b_row['cgst'] - g_row['cgst']) +
+                    abs(b_row['sgst'] - g_row['sgst']) +
+                    abs(b_row['cess'] - g_row['cess'])
+                )
+                if tot_tax_diff < min_tax_diff:
+                    min_tax_diff = tot_tax_diff
                     best_candidate = g_row
             
             if best_candidate is not None:
@@ -287,18 +258,18 @@ def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=
                 matched_books.add(b_idx)
                 matched_gstr2b.add(g_idx)
                 
-                val_diff = abs(b_row['taxable_val'] - best_candidate['taxable_val'])
-                days_diff = calculate_date_difference(b_row['doc_date'], best_candidate['doc_date'])
+                # Check tax variance
+                igst_diff = abs(b_row['igst'] - best_candidate['igst'])
+                cgst_diff = abs(b_row['cgst'] - best_candidate['cgst'])
+                sgst_diff = abs(b_row['sgst'] - best_candidate['sgst'])
+                cess_diff = abs(b_row['cess'] - best_candidate['cess'])
                 
-                # Determine mismatch nature
-                mismatch_reasons = []
-                if val_diff > val_tolerance:
-                    mismatch_reasons.append('Value Mismatch')
-                if not pd.isna(days_diff) and days_diff > date_tolerance_days:
-                    mismatch_reasons.append('Date Mismatch')
-                
-                status = " & ".join(mismatch_reasons) if mismatch_reasons else 'Matched'
-                reconciled_rows.append(create_reconciled_row(b_row, best_candidate, status, 'Level 2: ID Match with Discrepancy'))
+                if igst_diff > tax_tolerance or cgst_diff > tax_tolerance or sgst_diff > tax_tolerance or cess_diff > tax_tolerance:
+                    status = 'Tax Mismatch'
+                else:
+                    status = 'Matched'
+                    
+                reconciled_rows.append(create_reconciled_row(b_row, best_candidate, status, 'Level 1: Exact Key Match'))
 
     # --- LEVEL 3: Amendment Matching (Original Doc Number lookup) ---
     for b_row in b_rows:
@@ -315,7 +286,6 @@ def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=
             
         key = (gstin, doc_type, clean_no)
         candidates = g_by_amended_key.get(key, [])
-        
         available_candidates = [g for g in candidates if g['gstr2b_idx'] not in matched_gstr2b]
         
         if available_candidates:
@@ -324,8 +294,17 @@ def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=
             matched_books.add(b_idx)
             matched_gstr2b.add(g_idx)
             
-            val_diff = abs(b_row['taxable_val'] - best_candidate['taxable_val'])
-            status = 'Matched (Amended)' if val_diff <= val_tolerance else 'Value Mismatch (Amended)'
+            # Check tax variance
+            igst_diff = abs(b_row['igst'] - best_candidate['igst'])
+            cgst_diff = abs(b_row['cgst'] - best_candidate['cgst'])
+            sgst_diff = abs(b_row['sgst'] - best_candidate['sgst'])
+            cess_diff = abs(b_row['cess'] - best_candidate['cess'])
+            
+            if igst_diff > tax_tolerance or cgst_diff > tax_tolerance or sgst_diff > tax_tolerance or cess_diff > tax_tolerance:
+                status = 'Tax Mismatch (Amended)'
+            else:
+                status = 'Matched (Amended)'
+                
             reconciled_rows.append(create_reconciled_row(b_row, best_candidate, status, 'Level 3: Amendment Match'))
 
     # --- LEVEL 4: Fuzzy Invoice Number Match within Supplier GSTIN ---
@@ -395,8 +374,20 @@ def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=
                 g_idx = best_candidate['gstr2b_idx']
                 matched_books.add(b_idx)
                 matched_gstr2b.add(g_idx)
+                
+                # Check tax variance
+                igst_diff = abs(b_row['igst'] - best_candidate['igst'])
+                cgst_diff = abs(b_row['cgst'] - best_candidate['cgst'])
+                sgst_diff = abs(b_row['sgst'] - best_candidate['sgst'])
+                cess_diff = abs(b_row['cess'] - best_candidate['cess'])
+                
+                if igst_diff > tax_tolerance or cgst_diff > tax_tolerance or sgst_diff > tax_tolerance or cess_diff > tax_tolerance:
+                    status = 'Tax Mismatch (Fuzzy)'
+                else:
+                    status = 'Fuzzy Match'
+                    
                 reconciled_rows.append(create_reconciled_row(
-                    b_row, best_candidate, 'Fuzzy Match', f'Level 4: Fuzzy Match (Score: {int(best_score)}%)'
+                    b_row, best_candidate, status, f'Level 4: Fuzzy Match (Score: {int(best_score)}%)'
                 ))
 
     # --- ONLY IN BOOKS (Unmatched books entries) ---

@@ -4,7 +4,7 @@ import numpy as np
 import io
 import json
 from parser import parse_gstr2b_json, parse_purchase_register, auto_detect_columns, clean_invoice_number
-from reconciliation import reconcile_data, generate_supplier_summary
+from engine import reconcile_data, generate_supplier_summary
 import plotly.express as px
 import plotly.graph_objects as go
 from openpyxl import Workbook, load_workbook
@@ -490,12 +490,12 @@ def export_reco_to_excel(df_reco, df_supplier, summary_stats):
             'reco_status', 'itc_action', 'remarks', 'gst_law_remark',
             'books_gstin', 'books_supplier_name', 'books_doc_num', 'books_doc_date', 'books_doc_type',
             'books_taxable_val', 'books_igst', 'books_cgst', 'books_sgst', 'books_cess', 'books_total_val',
-            'books_pos', 'books_rchrg', 'books_section',
+            'books_pos', 'books_rchrg', 'books_pr_period',
             'gstr2b_gstin', 'gstr2b_supplier_name', 'gstr2b_doc_num', 'gstr2b_doc_date', 'gstr2b_doc_type',
             'gstr2b_taxable_val', 'gstr2b_igst', 'gstr2b_cgst', 'gstr2b_sgst', 'gstr2b_cess', 'gstr2b_total_val',
             'gstr2b_pos', 'gstr2b_rchrg', 'gstr2b_itc_eligibility', 'gstr2b_filing_date', 'gstr2b_gstr3b_status',
             'gstr2b_section', 'gstr2b_rtn_period', 'gstr2b_source_file',
-            'taxable_val_diff', 'igst_diff', 'cgst_diff', 'sgst_diff', 'days_diff'
+            'taxable_val_diff', 'igst_diff', 'cgst_diff', 'sgst_diff', 'cess_diff', 'days_diff'
         ]
         
         # Select and align columns present in dataframe
@@ -514,6 +514,71 @@ def export_reco_to_excel(df_reco, df_supplier, summary_stats):
     out_io.seek(0)
     return out_io
 
+def get_pr_template_bytes():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Purchase Register Template"
+    ws.views.sheetView[0].showGridLines = True
+    
+    # Header styling
+    header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    
+    headers = [
+        "Supplier GSTIN", "Supplier Name", "Invoice/Document Number", "Invoice Date", 
+        "Document Type", "Taxable Value", "IGST", "CGST", "SGST", "Cess", 
+        "Place of Supply (POS)", "Reverse Charge (RCM)", "PR Period"
+    ]
+    
+    ws.append(headers)
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+        
+    # Example Row
+    ws.append([
+        "27ABCDE1234F1Z5", "Alpha Suppliers Ltd", "INV-101", "10-03-2026",
+        "INV", 100000.0, 0.0, 9000.0, 9000.0, 0.0,
+        "27", "No", "032026"
+    ])
+    
+    # Instructions Sheet
+    ws_inst = wb.create_sheet(title="Instructions")
+    ws_inst.views.sheetView[0].showGridLines = True
+    ws_inst.column_dimensions['A'].width = 30
+    ws_inst.column_dimensions['B'].width = 50
+    
+    ws_inst['A1'] = "Column Name"
+    ws_inst['B1'] = "Description / Accepted Values"
+    for cell in (ws_inst['A1'], ws_inst['B1']):
+        cell.font = Font(name="Calibri", size=11, bold=True)
+        
+    instructions = [
+        ("Supplier GSTIN", "15-digit GSTIN of the supplier (e.g. 27ABCDE1234F1Z5)"),
+        ("Supplier Name", "Legal or trade name of the supplier"),
+        ("Invoice/Document Number", "Document reference number (cleans trailing float decimals, slashes, spaces)"),
+        ("Invoice Date", "Date of invoice (DD-MM-YYYY or standard Excel date)"),
+        ("Document Type", "INV (Invoice), CRN (Credit Note), DBN (Debit Note), IMPG (Import of Goods), ISD (ISD Journal)"),
+        ("Taxable Value", "Taxable value in INR"),
+        ("IGST", "Integrated Tax amount in INR"),
+        ("CGST", "Central Tax amount in INR"),
+        ("SGST", "State Tax amount in INR"),
+        ("Cess", "Cess amount in INR"),
+        ("Place of Supply (POS)", "2-digit state code of supply (e.g. 27)"),
+        ("Reverse Charge (RCM)", "Yes / No"),
+        ("PR Period", "Month/Year of purchase record (MMYYYY format, e.g. 032026)")
+    ]
+    
+    for row_idx, (col_name, desc) in enumerate(instructions, 2):
+        ws_inst.cell(row=row_idx, column=1, value=col_name).font = Font(name="Calibri", size=11, bold=True)
+        ws_inst.cell(row=row_idx, column=2, value=desc)
+        
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
 # Main Application Streamlit UI
 st.title("💼 GSTR-2B Reconciliation Dashboard")
 st.markdown("Reconcile GSTR-2B auto-drafted statements against internal Purchase Registers under active GST Rules & Laws.")
@@ -522,6 +587,18 @@ st.markdown("Reconcile GSTR-2B auto-drafted statements against internal Purchase
 with st.sidebar:
     st.header("⚙️ Reconciliation Settings")
     
+    # Download template helper
+    st.download_button(
+        label="📥 Download PR Template",
+        data=get_pr_template_bytes(),
+        file_name="purchase_register_template.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        help="Download standard Excel layout for the Purchase Register."
+    )
+    
+    st.markdown("---")
+    
     # Tolerances
     val_tol = st.slider("Taxable Value Tolerance (₹)", min_value=0.0, max_value=100.0, value=10.0, step=1.0, 
                         help="Allowable difference in taxable value between books and portal records.")
@@ -529,6 +606,14 @@ with st.sidebar:
                          help="Allowable variance between Books invoice date and Portal filing date.")
     fuzzy_tol = st.slider("Fuzzy Match Sensitivity (%)", min_value=70, max_value=100, value=85, step=5,
                           help="Minimum invoice number similarity score to classify as fuzzy matched.")
+    tax_tol = st.slider("Tax Amount Tolerance (₹)", min_value=0.0, max_value=100.0, value=10.0, step=1.0,
+                        help="Allowable difference in IGST/CGST/SGST/Cess amounts between Books and Portal.")
+                        
+    st.markdown("---")
+    if st.button("🧹 Clear All Data", use_container_width=True):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
     
     cn_convention = st.selectbox(
         "Credit Note Value Sign",
@@ -591,11 +676,17 @@ if st.session_state['loaded_synth']:
         'sgst': 'SGST',
         'doc_type': 'Voucher Type',
         'pos': 'POS',
-        'rchrg': 'RCM'
+        'rchrg': 'RCM',
+        'pr_period': 'PR Period'
     }
     
+    synth_books_df = st.session_state['synth_books'].copy()
+    if 'Cess' not in synth_books_df.columns:
+        synth_books_df['Cess'] = 0.0
+    synth_books_df['PR Period'] = '032026'
+    
     books_df = parse_purchase_register(
-        st.session_state['synth_books'], 
+        synth_books_df, 
         col_mapping, 
         credit_note_convention=cn_convention
     )
@@ -676,7 +767,8 @@ else:
                 ('supplier_name', 'Supplier Name', False),
                 ('doc_type', 'Document Type column', False),
                 ('pos', 'Place of Supply (POS)', False),
-                ('rchrg', 'Reverse Charge (RCM)', False)
+                ('rchrg', 'Reverse Charge (RCM)', False),
+                ('pr_period', 'PR Period / Month', False)
             ]
             
             for idx, (field_id, label, is_required) in enumerate(fields_meta):
@@ -727,7 +819,8 @@ if not gstr2b_df.empty and not books_df.empty:
                     gstr2b_df, 
                     val_tolerance=val_tol, 
                     date_tolerance_days=date_tol, 
-                    fuzzy_threshold=fuzzy_tol
+                    fuzzy_threshold=fuzzy_tol,
+                    tax_tolerance=tax_tol
                 )
                 df_supplier = generate_supplier_summary(df_reco)
                 
@@ -971,7 +1064,7 @@ if 'reco_executed' in st.session_state and st.session_state['reco_executed']:
                 ])
                 
                 if show_compliance_cols:
-                    col_order_list.extend(['books_pos', 'books_rchrg'])
+                    col_order_list.extend(['books_pos', 'books_rchrg', 'books_pr_period'])
                     
                 col_order_list.extend([
                     'gstr2b_gstin', 'gstr2b_doc_num', 'gstr2b_doc_date', 'gstr2b_taxable_val', 'gstr2b_igst', 'gstr2b_cgst', 'gstr2b_sgst'
@@ -994,12 +1087,51 @@ if 'reco_executed' in st.session_state and st.session_state['reco_executed']:
                 st.info("No records matching current filters.")
                 
         with explorer_tabs[1]:
-            st.markdown("Grouped supplier-wise summary of reconciliation counts and tax values.")
+            st.markdown("### 🏢 Supplier Performance Analysis")
             if not df_supplier.empty:
                 df_supp_filtered = df_supplier.copy()
                 if gstin_filter != "All":
                     df_supp_filtered = df_supp_filtered[df_supp_filtered['supplier_gstin'] == gstin_filter]
                 
+                # Visual KPIs row
+                sc_1, sc_2 = st.columns(2)
+                
+                with sc_1:
+                    # Bar chart for Top 5 suppliers by absolute ITC variance
+                    df_supp_filtered['abs_itc_diff'] = df_supp_filtered['itc_diff'].abs()
+                    top_diff_suppliers = df_supp_filtered.sort_values(by='abs_itc_diff', ascending=False).head(5)
+                    
+                    fig_diff = px.bar(
+                        top_diff_suppliers,
+                        x='supplier_name',
+                        y='itc_diff',
+                        title="Top 5 Suppliers by ITC Variance (INR)",
+                        labels={'supplier_name': 'Supplier', 'itc_diff': 'ITC Variance (INR)'},
+                        color='itc_diff',
+                        color_continuous_scale='rdbu_r',
+                        text_auto='.2s'
+                    )
+                    fig_diff.update_layout(showlegend=False, height=350, margin=dict(t=40, b=20, l=20, r=20))
+                    st.plotly_chart(fig_diff, use_container_width=True)
+                    
+                with sc_2:
+                    # Bar chart for Suppliers with the lowest Match Rates
+                    worst_match_suppliers = df_supp_filtered.sort_values(by='match_rate_pct', ascending=True).head(5)
+                    
+                    fig_match = px.bar(
+                        worst_match_suppliers,
+                        x='supplier_name',
+                        y='match_rate_pct',
+                        title="Suppliers with Lowest Match Rates (%)",
+                        labels={'supplier_name': 'Supplier', 'match_rate_pct': 'Match Rate (%)'},
+                        color='match_rate_pct',
+                        color_continuous_scale='reds_r',
+                        text_auto='.0f'
+                    )
+                    fig_match.update_layout(showlegend=False, height=350, margin=dict(t=40, b=20, l=20, r=20))
+                    st.plotly_chart(fig_match, use_container_width=True)
+                    
+                st.markdown("#### 📑 Detailed Supplier Summary Table")
                 st.dataframe(
                     df_supp_filtered,
                     column_order=[
@@ -1007,6 +1139,19 @@ if 'reco_executed' in st.session_state and st.session_state['reco_executed']:
                         'books_taxable_val', 'books_total_itc', 'gstr2b_taxable_val', 'gstr2b_total_itc',
                         'taxable_val_diff', 'itc_diff', 'match_rate_pct'
                     ],
+                    column_config={
+                        "supplier_gstin": "Supplier GSTIN",
+                        "supplier_name": "Supplier Name",
+                        "books_invoice_count": st.column_config.NumberColumn("Books Count", format="%d"),
+                        "gstr2b_invoice_count": st.column_config.NumberColumn("2B Count", format="%d"),
+                        "books_taxable_val": st.column_config.NumberColumn("Books Taxable", format="Rs. %.2f"),
+                        "books_total_itc": st.column_config.NumberColumn("Books ITC", format="Rs. %.2f"),
+                        "gstr2b_taxable_val": st.column_config.NumberColumn("2B Taxable", format="Rs. %.2f"),
+                        "gstr2b_total_itc": st.column_config.NumberColumn("2B ITC", format="Rs. %.2f"),
+                        "taxable_val_diff": st.column_config.NumberColumn("Taxable Diff", format="Rs. %.2f"),
+                        "itc_diff": st.column_config.NumberColumn("ITC Diff", format="Rs. %.2f"),
+                        "match_rate_pct": st.column_config.ProgressColumn("Match Rate (%)", format="%.0f%%", min_value=0, max_value=100)
+                    },
                     use_container_width=True,
                     height=450
                 )
