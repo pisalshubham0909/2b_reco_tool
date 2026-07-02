@@ -657,17 +657,31 @@ with st.sidebar:
         st.session_state['synth_json'] = json_content
         st.session_state['synth_books'] = df_books_synth
         st.session_state['loaded_synth'] = True
-        st.success("Loaded GSTR-2B JSON and Purchase Register mock datasets featuring ISD, RCM, SEZ, Late, and Blocked ITC entries.")
+        st.session_state['sandbox_success_msg'] = "Loaded GSTR-2B JSON and Purchase Register mock datasets featuring ISD, RCM, SEZ, Late, and Blocked ITC entries."
         # Clear reconciliation state to force recalculation on new data
         st.session_state['reco_executed'] = False
         if 'reco_results' in st.session_state:
             del st.session_state['reco_results']
         if 'supplier_results' in st.session_state:
             del st.session_state['supplier_results']
+        st.rerun()
 
 # State initialization
 if 'loaded_synth' not in st.session_state:
     st.session_state['loaded_synth'] = False
+
+# Render success messages on page load after rerun
+if 'gstr2b_success_msg' in st.session_state:
+    st.success(st.session_state['gstr2b_success_msg'])
+    del st.session_state['gstr2b_success_msg']
+
+if 'books_success_msg' in st.session_state:
+    st.success(st.session_state['books_success_msg'])
+    del st.session_state['books_success_msg']
+
+if 'sandbox_success_msg' in st.session_state:
+    st.success(st.session_state['sandbox_success_msg'])
+    del st.session_state['sandbox_success_msg']
 
 # Load data logic
 gstr2b_df = pd.DataFrame()
@@ -754,13 +768,14 @@ else:
                 else:
                     st.session_state['gstr2b_df_parsed'] = gstr2b_df
                     st.session_state['gstr2b_files_sigs'] = uploaded_g2b_sigs
-                    st.success(f"Successfully loaded {len(gstr2b_files)} GSTR-2B JSON file(s) ({len(gstr2b_df)} total records).")
+                    st.session_state['gstr2b_success_msg'] = f"Successfully loaded {len(gstr2b_files)} GSTR-2B JSON file(s) ({len(gstr2b_df)} total records)."
                     # Clear reconciliation state to force recalculation on new data
                     st.session_state['reco_executed'] = False
                     if 'reco_results' in st.session_state:
                         del st.session_state['reco_results']
                     if 'supplier_results' in st.session_state:
                         del st.session_state['supplier_results']
+                    st.rerun()
                         
     # Load GSTR-2B from session state if already parsed
     if 'gstr2b_df_parsed' in st.session_state:
@@ -904,13 +919,14 @@ else:
                         books_df = pd.concat(books_dfs, ignore_index=True)
                         st.session_state['books_df_parsed'] = books_df
                         st.session_state['books_files_sigs'] = uploaded_books_sigs
-                        st.success(f"Successfully loaded {len(books_files)} Purchase Register file(s) ({len(books_df)} total records).")
+                        st.session_state['books_success_msg'] = f"Successfully loaded {len(books_files)} Purchase Register file(s) ({len(books_df)} total records)."
                         # Clear reconciliation state to force recalculation on new data
                         st.session_state['reco_executed'] = False
                         if 'reco_results' in st.session_state:
                             del st.session_state['reco_results']
                         if 'supplier_results' in st.session_state:
                             del st.session_state['supplier_results']
+                        st.rerun()
                 except Exception as e:
                     st.error(f"Error loading Purchase Registers: {str(e)}")
         except Exception as e:
