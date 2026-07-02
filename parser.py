@@ -90,7 +90,7 @@ def parse_date(date_val):
         return pd.NaT
     if isinstance(date_val, pd.Timestamp):
         return date_val
-    if isinstance(date_val, (int, float)):
+    if isinstance(date_val, (int, _builtin_float)):
         # Excel numeric date handling
         try:
             return pd.to_datetime(date_val, unit='D', origin='1899-12-30')
