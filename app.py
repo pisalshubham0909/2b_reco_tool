@@ -658,6 +658,12 @@ with st.sidebar:
         st.session_state['synth_books'] = df_books_synth
         st.session_state['loaded_synth'] = True
         st.success("Loaded GSTR-2B JSON and Purchase Register mock datasets featuring ISD, RCM, SEZ, Late, and Blocked ITC entries.")
+        # Clear reconciliation state to force recalculation on new data
+        st.session_state['reco_executed'] = False
+        if 'reco_results' in st.session_state:
+            del st.session_state['reco_results']
+        if 'supplier_results' in st.session_state:
+            del st.session_state['supplier_results']
 
 # State initialization
 if 'loaded_synth' not in st.session_state:
@@ -702,7 +708,10 @@ if st.session_state['loaded_synth']:
     
 else:
     # 1. Parse Uploaded GSTR-2B JSON
-    if gstr2b_files:
+    uploaded_g2b_sigs = [(f.name, f.size) for f in gstr2b_files] if gstr2b_files else []
+    cached_g2b_sigs = st.session_state.get('gstr2b_files_sigs', [])
+    
+    if gstr2b_files and uploaded_g2b_sigs != cached_g2b_sigs:
         dfs = []
         for file in gstr2b_files:
             file_name = file.name
@@ -715,7 +724,29 @@ else:
                 st.error(f"Error parsing GSTR-2B file {file_name}: {str(e)}")
         if dfs:
             gstr2b_df = pd.concat(dfs, ignore_index=True)
+            st.session_state['gstr2b_df_parsed'] = gstr2b_df
+            st.session_state['gstr2b_files_sigs'] = uploaded_g2b_sigs
             st.success(f"Successfully parsed {len(gstr2b_files)} GSTR-2B JSON file(s) ({len(gstr2b_df)} total records).")
+            # Clear reconciliation state to force recalculation on new data
+            st.session_state['reco_executed'] = False
+            if 'reco_results' in st.session_state:
+                del st.session_state['reco_results']
+            if 'supplier_results' in st.session_state:
+                del st.session_state['supplier_results']
+    elif 'gstr2b_df_parsed' in st.session_state:
+        gstr2b_df = st.session_state['gstr2b_df_parsed']
+        
+    # If GSTR-2B files uploader is cleared, wipe cached data
+    if not gstr2b_files and 'gstr2b_df_parsed' in st.session_state:
+        del st.session_state['gstr2b_df_parsed']
+        if 'gstr2b_files_sigs' in st.session_state:
+            del st.session_state['gstr2b_files_sigs']
+        st.session_state['reco_executed'] = False
+        if 'reco_results' in st.session_state:
+            del st.session_state['reco_results']
+        if 'supplier_results' in st.session_state:
+            del st.session_state['supplier_results']
+        gstr2b_df = pd.DataFrame()
 
     # 2. Parse Uploaded Purchase Register
     if books_files:
@@ -830,14 +861,53 @@ else:
                         books_df = pd.concat(books_dfs, ignore_index=True)
                         st.session_state['books_df_parsed'] = books_df
                         st.success(f"Successfully loaded {len(books_files)} Purchase Register file(s) ({len(books_df)} total records).")
+                        # Clear reconciliation state to force recalculation on new data
+                        st.session_state['reco_executed'] = False
+                        if 'reco_results' in st.session_state:
+                            del st.session_state['reco_results']
+                        if 'supplier_results' in st.session_state:
+                            del st.session_state['supplier_results']
                 except Exception as e:
                     st.error(f"Error loading Purchase Registers: {str(e)}")
         except Exception as e:
             st.error(f"Error reading file structure: {str(e)}")
+            
+    # If Purchase Register files uploader is cleared, wipe cached data
+    if not books_files and 'books_df_parsed' in st.session_state:
+        del st.session_state['books_df_parsed']
+        st.session_state['reco_executed'] = False
+        if 'reco_results' in st.session_state:
+            del st.session_state['reco_results']
+        if 'supplier_results' in st.session_state:
+            del st.session_state['supplier_results']
+        books_df = pd.DataFrame()
 
 # If books register is loaded in state
 if 'books_df_parsed' in st.session_state:
     books_df = st.session_state['books_df_parsed']
+
+# Show previews of loaded files
+if not gstr2b_df.empty or not books_df.empty:
+    st.markdown("---")
+    st.subheader("🔍 Preview Loaded Data")
+    preview_tabs_titles = []
+    if not books_df.empty:
+        preview_tabs_titles.append("📖 Purchase Register (Books)")
+    if not gstr2b_df.empty:
+        preview_tabs_titles.append("🌐 GSTR-2B Portal Data")
+        
+    if preview_tabs_titles:
+        tabs = st.tabs(preview_tabs_titles)
+        tab_idx = 0
+        if not books_df.empty:
+            with tabs[tab_idx]:
+                st.markdown(f"**Loaded {len(books_df)} records** from Purchase Register:")
+                st.dataframe(books_df.head(10), use_container_width=True)
+            tab_idx += 1
+        if not gstr2b_df.empty:
+            with tabs[tab_idx]:
+                st.markdown(f"**Loaded {len(gstr2b_df)} records** from GSTR-2B Statement:")
+                st.dataframe(gstr2b_df.head(10), use_container_width=True)
 
 # Reconciliation Trigger
 if not gstr2b_df.empty and not books_df.empty:
