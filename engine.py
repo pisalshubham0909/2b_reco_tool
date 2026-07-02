@@ -415,6 +415,14 @@ def reconcile_data(books_df, gstr2b_df, val_tolerance=10.0, date_tolerance_days=
         return pd.DataFrame()
         
     df_reco = pd.DataFrame(reconciled_rows)
+    
+    # Clean temporary indexes
+    if 'books_idx' in df_reco.columns:
+        df_reco = df_reco.drop(columns=['books_idx'], errors='ignore')
+    if 'gstr2b_idx' in df_reco.columns:
+        df_reco = df_reco.drop(columns=['gstr2b_idx'], errors='ignore')
+        
+    return df_reco
 
 def generate_supplier_summary(df_reco):
     """
