@@ -642,11 +642,11 @@ with st.sidebar:
     )
     
     # Books File upload
-    books_file = st.file_uploader(
+    books_files = st.file_uploader(
         "Purchase Register (Excel/CSV - Up to 1GB)", 
         type=["xlsx", "xls", "csv"], 
-        accept_multiple_files=False,
-        help="Upload your Purchase Register sheet."
+        accept_multiple_files=True,
+        help="Upload one or multiple Purchase Register sheets."
     )
     
     # Sandbox Testing Button
@@ -718,35 +718,41 @@ else:
             st.success(f"Successfully parsed {len(gstr2b_files)} GSTR-2B JSON file(s) ({len(gstr2b_df)} total records).")
 
     # 2. Parse Uploaded Purchase Register
-    if books_file:
-        if books_file.name.lower().endswith('.xls'):
-            try:
-                xl = pd.ExcelFile(books_file)
-                sheet_names = xl.sheet_names
-            except Exception as e:
-                st.error(f"Error reading legacy Excel sheets: {str(e)}")
-        elif books_file.name.lower().endswith(('.xlsx', '.xlsm')):
-            try:
-                wb = load_workbook(books_file, read_only=True)
-                sheet_names = wb.sheetnames
-                wb.close()
-            except Exception as e:
-                st.error(f"Error reading sheets from Excel: {str(e)}")
+    if books_files:
+        for file in books_files:
+            if file.name.lower().endswith('.xls'):
+                try:
+                    xl = pd.ExcelFile(file)
+                    for s in xl.sheet_names:
+                        if s not in sheet_names:
+                            sheet_names.append(s)
+                except Exception:
+                    pass
+            elif file.name.lower().endswith(('.xlsx', '.xlsm')):
+                try:
+                    wb = load_workbook(file, read_only=True)
+                    for s in wb.sheetnames:
+                        if s not in sheet_names:
+                            sheet_names.append(s)
+                    wb.close()
+                except Exception:
+                    pass
                 
         if len(sheet_names) > 1:
             selected_sheet = st.selectbox("Select Excel Worksheet", options=sheet_names)
             
         try:
-            # Quick head load to fetch headers
-            books_file.seek(0)
-            if books_file.name.endswith('.csv'):
-                header_df = pd.read_csv(books_file, nrows=0)
-            elif books_file.name.lower().endswith('.xls') or books_file.size <= 10 * 1024 * 1024:
-                header_df = pd.read_excel(books_file, sheet_name=selected_sheet or 0, nrows=0)
+            # Quick head load to fetch headers from first file
+            first_file = books_files[0]
+            first_file.seek(0)
+            if first_file.name.endswith('.csv'):
+                header_df = pd.read_csv(first_file, nrows=0)
+            elif first_file.name.lower().endswith('.xls') or first_file.size <= 10 * 1024 * 1024:
+                header_df = pd.read_excel(first_file, sheet_name=selected_sheet or 0, nrows=0)
             else:
                 # Large xlsx file: use openpyxl read_only for low memory
-                wb = load_workbook(books_file, read_only=True)
-                ws = wb[selected_sheet] if selected_sheet else wb.active
+                wb = load_workbook(first_file, read_only=True)
+                ws = wb[selected_sheet] if (selected_sheet and selected_sheet in wb.sheetnames) else wb.active
                 rows = ws.iter_rows(values_only=True)
                 headers_raw = next(rows)
                 wb.close()
@@ -796,22 +802,41 @@ else:
                         
             if st.button("Load Purchase Register"):
                 try:
-                    books_file.seek(0)
-                    books_df = parse_purchase_register(
-                        books_file, 
-                        col_mapping, 
-                        sheet_name=selected_sheet, 
-                        credit_note_convention=cn_convention
-                    )
-                    st.session_state['books_df_parsed'] = books_df
-                    st.success(f"Purchase Register loaded successfully! ({len(books_df)} documents parsed).")
+                    books_dfs = []
+                    for file in books_files:
+                        file.seek(0)
+                        cur_sheet = selected_sheet
+                        if file.name.lower().endswith(('.xlsx', '.xlsm', '.xls')):
+                            if file.name.lower().endswith('.xls'):
+                                xl = pd.ExcelFile(file)
+                                file_sheets = xl.sheet_names
+                            else:
+                                wb = load_workbook(file, read_only=True)
+                                file_sheets = wb.sheetnames
+                                wb.close()
+                            if selected_sheet not in file_sheets:
+                                cur_sheet = file_sheets[0] if file_sheets else 0
+                                
+                        parsed_df = parse_purchase_register(
+                            file, 
+                            col_mapping, 
+                            sheet_name=cur_sheet, 
+                            credit_note_convention=cn_convention
+                        )
+                        parsed_df['books_source_file'] = file.name
+                        books_dfs.append(parsed_df)
+                        
+                    if books_dfs:
+                        books_df = pd.concat(books_dfs, ignore_index=True)
+                        st.session_state['books_df_parsed'] = books_df
+                        st.success(f"Successfully loaded {len(books_files)} Purchase Register file(s) ({len(books_df)} total records).")
                 except Exception as e:
-                    st.error(f"Error loading Purchase Register: {str(e)}")
+                    st.error(f"Error loading Purchase Registers: {str(e)}")
         except Exception as e:
             st.error(f"Error reading file structure: {str(e)}")
 
 # If books register is loaded in state
-if 'books_df_parsed' in st.session_state and not books_file is None:
+if 'books_df_parsed' in st.session_state:
     books_df = st.session_state['books_df_parsed']
 
 # Reconciliation Trigger

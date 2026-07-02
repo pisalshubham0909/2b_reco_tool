@@ -12,30 +12,35 @@ def get_json_section(data, key):
     if not isinstance(data, dict):
         return []
     
+    raw_val = []
     # Direct match
     if key in data:
-        return data[key]
-    
+        raw_val = data[key]
     # Check standard 'data' wrappers
-    if 'data' in data:
+    elif 'data' in data:
         inner = data['data']
         if isinstance(inner, dict):
             if key in inner:
-                return inner[key]
-            if 'data' in inner:
+                raw_val = inner[key]
+            elif 'data' in inner:
                 double_inner = inner['data']
                 if isinstance(double_inner, dict) and key in double_inner:
-                    return double_inner[key]
+                    raw_val = double_inner[key]
                 
-    # Exhaustive search for the key (as a fallback)
-    for k, v in data.items():
-        if k == key and isinstance(v, list):
-            return v
-        if isinstance(v, dict):
-            res = get_json_section(v, key)
-            if res:
-                return res
-            
+    if not raw_val:
+        # Exhaustive search for the key (as a fallback)
+        for k, v in data.items():
+            if k == key:
+                raw_val = v
+                break
+            if isinstance(v, dict):
+                res = get_json_section(v, key)
+                if res:
+                    raw_val = res
+                    break
+
+    if isinstance(raw_val, list):
+        return [item for item in raw_val if isinstance(item, dict)]
     return []
 
 def clean_invoice_number(inv_no):
@@ -103,6 +108,16 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
         # File-like object
         data = json.load(json_content_or_path)
 
+    # Handle double serialization (where JSON contains a stringified JSON object)
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except Exception:
+            pass
+
+    if not isinstance(data, dict):
+        raise ValueError("Invalid GSTR-2B JSON structure: Root element must be a dictionary/object.")
+
     # Attempt to extract return period and recipient GSTIN
     rtn_period = data.get('rtnprd') or data.get('fp')
     recipient_gstin = data.get('gstin') or data.get('rcptgstin')
@@ -115,14 +130,20 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
 
     # Helper function to extract document list from standard formats
     def get_doc_list(parent_obj):
+        if not isinstance(parent_obj, dict):
+            return []
+        doc_list = []
         if 'doclist' in parent_obj:
-            return parent_obj['doclist']
-        if 'inv' in parent_obj:
-            return parent_obj['inv']
-        if 'nt' in parent_obj:
-            return parent_obj['nt']
-        if 'boe' in parent_obj:
-            return parent_obj['boe']
+            doc_list = parent_obj['doclist']
+        elif 'inv' in parent_obj:
+            doc_list = parent_obj['inv']
+        elif 'nt' in parent_obj:
+            doc_list = parent_obj['nt']
+        elif 'boe' in parent_obj:
+            doc_list = parent_obj['boe']
+            
+        if isinstance(doc_list, list):
+            return [item for item in doc_list if isinstance(item, dict)]
         return []
 
     # 1. Parse B2B Invoices

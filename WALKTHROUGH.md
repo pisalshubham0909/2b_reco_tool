@@ -10,6 +10,7 @@ The following files in this directory have been updated:
 
 ### 1. `reconciliation.py`
 *   **Consolidated Exporter**: Rebuilt the openpyxl exporter to output all matched, mismatched, and unmatched records into a single worksheet tab named **`Reconciliation Report`**, side-by-side with complete remarks and compliance laws, rather than split tabs.
+*   **Multiple Purchase Registers**: Configure the uploader to accept multiple files simultaneously (`accept_multiple_files=True`), and automatically parse, merge, and track source filenames for all uploaded records.
 *   **Excel Upload fallbacks**: Added checks to handle legacy `.xls` sheet formats via `pandas`/`xlrd` and standard `.xlsx` files below 10MB using pandas direct reading to avoid stream pointer conflicts.
 *   **Column Auto-Mapping**: Auto-detects column headers for GSTIN, invoice dates, and taxable values, rendering them directly in the Streamlit Interactive Explorer.
 *   **Interactive Mapper UI**: Display user selections for *every* PR column (including PR Period). Auto-populate using updated dictionary mappings.
@@ -25,6 +26,7 @@ The following files in this directory have been updated:
 *   **Document Type Normalizer**: Map various Excel strings to standard types (`INV`, `CRN` (Credit Note), `DBN` (Debit Note), `IMPG` (Import), `ISD` (Input Service Distributor)).
 *   **Clean Invoice Number**: Strip trailing float `.0`/`.00` suffixes and normalize punctuations/spaces before comparisons to resolve partial matches.
 *   **Synonym Updates**: Added synonyms to map template headers like `Document Date`, `Document Value`, and `Reported Period` automatically.
+*   **Parser Robustness (Double Serialization & Types)**: Automatically parses stringified JSON structures, and strictly validates node data types during list/dictionary unpacking to block `'str' object has no attribute 'get'` exceptions.
 
 ### 3. `engine.py`
 *   **$O(N)$ Linear Matching Speedup**: Redesigned the matching loops to index records using compound tuple keys `(gstin, doc_type, clean_doc_num)` in memory-hashed dictionaries (`defaultdict`). This replaces slow pandas dataframe filtering inside loops with $O(1)$ lookups, cutting down 100,000-record matching times to under 2 seconds.
@@ -53,7 +55,7 @@ The following files in this directory have been updated:
 
 3. Load your files:
    * **GSTR-2B**: Upload one or multiple official JSON files.
-   * **Purchase Register**: Upload your Excel (`.xlsx`, `.xls`) or CSV file.
+   * **Purchase Register**: Upload one or multiple Excel (`.xlsx`, `.xls`) or CSV files at the same time.
    * **PR Template**: Click **"Download PR Template"** to download the standard layout for reference.
    * **Sandbox**: Click **"Generate & Load Synthetic Data"** in the sidebar to load mock datasets containing SEZ, ISD, and RCM entries.
 
