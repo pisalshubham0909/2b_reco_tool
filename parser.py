@@ -788,18 +788,18 @@ def auto_detect_columns(columns):
     keywords = {
         'supplier_gstin': ['gstin', 'gst', 'gst no', 'gstin/uin', 'supplier gst', 'ctin', 'party gst', 'vendor gstin'],
         'supplier_name': ['supplier name', 'vendor name', 'party name', 'name', 'supplier_name', 'party_name', 'lglname', 'legal name', 'vendor name'],
-        'doc_num': ['invoice number', 'invoice no', 'inv no', 'bill no', 'voucher no', 'document number', 'doc no', 'invoice_no', 'inv_num', 'inum', 'document no', 'bill number'],
-        'doc_date': ['invoice date', 'date', 'inv date', 'bill date', 'voucher date', 'doc date', 'invoice_dt', 'idt', 'invoice_date', 'bill date'],
+        'doc_num': ['invoice number', 'invoice no', 'inv no', 'bill no', 'voucher no', 'document number', 'doc no', 'invoice_no', 'inv_num', 'inum', 'document no', 'bill number', 'document no'],
+        'doc_date': ['invoice date', 'date', 'inv date', 'bill date', 'voucher date', 'doc date', 'invoice_dt', 'idt', 'invoice_date', 'bill date', 'document date'],
         'taxable_val': ['taxable value', 'taxable amount', 'taxable amt', 'taxable val', 'assessable value', 'taxable_value', 'taxable_amt', 'txval', 'purchase value'],
         'igst': ['igst', 'integrated tax', 'igst amount', 'igst amt', 'igst_amt', 'igst_val'],
         'cgst': ['cgst', 'central tax', 'cgst amount', 'cgst amt', 'cgst_amt', 'cgst_val'],
         'sgst': ['sgst', 'state tax', 'sgst amount', 'sgst amt', 'sgst_amt', 'sgst_val', 'utgst', 'utgst amt', 'utgst_amount'],
         'cess': ['cess', 'cess amount', 'cess amt', 'cess_amt', 'cess_val', 'cec'],
-        'total_val': ['total value', 'invoice value', 'total amount', 'inv value', 'bill amount', 'invoice_val', 'val', 'total_amt', 'gross value', 'invoice amount'],
+        'total_val': ['total value', 'invoice value', 'total amount', 'inv value', 'bill amount', 'invoice_val', 'val', 'total_amt', 'gross value', 'invoice amount', 'document value', 'doc value'],
         'doc_type': ['document type', 'doc type', 'voucher type', 'vtype', 'type', 'doc_type', 'voucher name'],
         'pos': ['pos', 'place of supply', 'place_of_supply', 'state code', 'supply state'],
         'rchrg': ['rchrg', 'reverse charge', 'rcm', 'rc', 'reverse_charge'],
-        'pr_period': ['period', 'month', 'return period', 'return_period', 'pr period', 'pr_period', 'rtnprd', 'month/year', 'reco period']
+        'pr_period': ['period', 'month', 'return period', 'return_period', 'pr period', 'pr_period', 'rtnprd', 'month/year', 'reco period', 'reported period', 'reported_period']
     }
     
     for field, terms in keywords.items():

@@ -13,7 +13,7 @@ The following files in this directory have been updated:
 *   **Excel Upload fallbacks**: Added checks to handle legacy `.xls` sheet formats via `pandas`/`xlrd` and standard `.xlsx` files below 10MB using pandas direct reading to avoid stream pointer conflicts.
 *   **Column Auto-Mapping**: Auto-detects column headers for GSTIN, invoice dates, and taxable values, rendering them directly in the Streamlit Interactive Explorer.
 *   **Interactive Mapper UI**: Display user selections for *every* PR column (including PR Period). Auto-populate using updated dictionary mappings.
-*   **Standard PR Template Exporter**: Added a button to download a standard, pre-formatted Excel template.
+*   **Standard PR Template Exporter**: Added a button to download a standard, pre-formatted Excel template featuring the exact requested columns (Entity GSTIN, Place of Supply, Document Type, Document No, Document Date, Document Value, Transaction Type, Reported Period, Vendor GSTIN, Vendor POS, Taxable Value, GST Rate, IGST, CGST, SGST, Cess Amount, Cess Rate, Remarks, Other Remarks).
 *   **Supplier Summary Grid & Plotly Charts**: Added Plotly bar charts analyzing suppliers with high ITC variance and match rates, and rendered progress indicators for match percentages.
 *   **Clear Data Option**: Sidebar button to clear session variables and force a clean Streamlit rerun.
 *   **Concurrency Safe**: Bypassed disk caches, using in-memory Byte IO streams to safely scale to 100+ concurrent users.
@@ -24,6 +24,7 @@ The following files in this directory have been updated:
 *   **CEC and IDT Auto-Mapping**: Added `'cec'` to **Cess** detection patterns, and configured the detector search threshold to support 3-character sub-string lookups.
 *   **Document Type Normalizer**: Map various Excel strings to standard types (`INV`, `CRN` (Credit Note), `DBN` (Debit Note), `IMPG` (Import), `ISD` (Input Service Distributor)).
 *   **Clean Invoice Number**: Strip trailing float `.0`/`.00` suffixes and normalize punctuations/spaces before comparisons to resolve partial matches.
+*   **Synonym Updates**: Added synonyms to map template headers like `Document Date`, `Document Value`, and `Reported Period` automatically.
 
 ### 3. `engine.py`
 *   **$O(N)$ Linear Matching Speedup**: Redesigned the matching loops to index records using compound tuple keys `(gstin, doc_type, clean_doc_num)` in memory-hashed dictionaries (`defaultdict`). This replaces slow pandas dataframe filtering inside loops with $O(1)$ lookups, cutting down 100,000-record matching times to under 2 seconds.
@@ -32,7 +33,10 @@ The following files in this directory have been updated:
     *   Added custom tax tolerance parameter (defaulting to ₹10) for IGST/CGST/SGST/Cess amounts.
 *   **GST Law Citation Engine**: Automatically matches regulations and generates references to the CGST Act (Section 17(5) for ineligible ITC, Section 9(3)/9(4) for RCM, Section 20 for ISD).
 
-### 4. `.streamlit/config.toml`
+### 4. `app.py`
+*   Kept in sync as an exact copy of `reconciliation.py` to ensure hot reload stability on all Streamlit Community Cloud configurations.
+
+### 5. `.streamlit/config.toml`
 *   Configured the maximum upload file size to **1024MB (1GB)** to allow importing huge registers directly.
 
 ---

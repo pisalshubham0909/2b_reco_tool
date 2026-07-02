@@ -525,9 +525,10 @@ def get_pr_template_bytes():
     header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
     
     headers = [
-        "Supplier GSTIN", "Supplier Name", "Invoice/Document Number", "Invoice Date", 
-        "Document Type", "Taxable Value", "IGST", "CGST", "SGST", "Cess", 
-        "Place of Supply (POS)", "Reverse Charge (RCM)", "PR Period"
+        "Entity GSTIN", "Place of Supply", "Document Type", "Document No", 
+        "Document Date", "Document Value", "Transaction Type", "Reported Period", 
+        "Vendor GSTIN", "Vendor POS", "Taxable Value", "GST Rate", 
+        "IGST", "CGST", "SGST", "Cess Amount", "Cess Rate", "Remarks", "Other Remarks"
     ]
     
     ws.append(headers)
@@ -539,9 +540,10 @@ def get_pr_template_bytes():
         
     # Example Row
     ws.append([
-        "27ABCDE1234F1Z5", "Alpha Suppliers Ltd", "INV-101", "10-03-2026",
-        "INV", 100000.0, 0.0, 9000.0, 9000.0, 0.0,
-        "27", "No", "032026"
+        "27MYCOMPANY123", "27", "INV", "INV-101", 
+        "10-03-2026", 118000.0, "Regular", "032026", 
+        "27ABCDE1234F1Z5", "27", 100000.0, 18.0, 
+        0.0, 9000.0, 9000.0, 0.0, 0.0, "Input credit invoice", "Self assessed"
     ])
     
     # Instructions Sheet
@@ -556,19 +558,25 @@ def get_pr_template_bytes():
         cell.font = Font(name="Calibri", size=11, bold=True)
         
     instructions = [
-        ("Supplier GSTIN", "15-digit GSTIN of the supplier (e.g. 27ABCDE1234F1Z5)"),
-        ("Supplier Name", "Legal or trade name of the supplier"),
-        ("Invoice/Document Number", "Document reference number (cleans trailing float decimals, slashes, spaces)"),
-        ("Invoice Date", "Date of invoice (DD-MM-YYYY or standard Excel date)"),
-        ("Document Type", "INV (Invoice), CRN (Credit Note), DBN (Debit Note), IMPG (Import of Goods), ISD (ISD Journal)"),
-        ("Taxable Value", "Taxable value in INR"),
-        ("IGST", "Integrated Tax amount in INR"),
-        ("CGST", "Central Tax amount in INR"),
-        ("SGST", "State Tax amount in INR"),
-        ("Cess", "Cess amount in INR"),
-        ("Place of Supply (POS)", "2-digit state code of supply (e.g. 27)"),
-        ("Reverse Charge (RCM)", "Yes / No"),
-        ("PR Period", "Month/Year of purchase record (MMYYYY format, e.g. 032026)")
+        ("Entity GSTIN", "The company's own GSTIN (e.g. 27MYCOMPANY123)"),
+        ("Place of Supply", "Place of supply state code (e.g. 27 for Maharashtra)"),
+        ("Document Type", "Type of voucher (INV, CRN, DBN, IMPG, ISD)"),
+        ("Document No", "Invoice / Document reference number"),
+        ("Document Date", "Date of the document (DD-MM-YYYY)"),
+        ("Document Value", "Total gross document value in INR (including taxes)"),
+        ("Transaction Type", "Transaction category (Regular, RCM, SEZ, Import)"),
+        ("Reported Period", "Filing return period in MMYYYY format (e.g. 032026)"),
+        ("Vendor GSTIN", "15-digit GSTIN of the supplier/vendor"),
+        ("Vendor POS", "Place of supply of the vendor state code (e.g. 27)"),
+        ("Taxable Value", "Net taxable value in INR"),
+        ("GST Rate", "Applicable GST tax rate percentage (e.g. 18.0)"),
+        ("IGST", "Integrated tax amount in INR"),
+        ("CGST", "Central tax amount in INR"),
+        ("SGST", "State/UT tax amount in INR"),
+        ("Cess Amount", "Cess tax amount in INR"),
+        ("Cess Rate", "Applicable Cess rate percentage"),
+        ("Remarks", "General user remarks/comments"),
+        ("Other Remarks", "Additional document-level audit notes")
     ]
     
     for row_idx, (col_name, desc) in enumerate(instructions, 2):
