@@ -709,7 +709,18 @@ if st.session_state['loaded_synth']:
 else:
     # 1. Parse Uploaded GSTR-2B JSON
     uploaded_g2b_sigs = [(f.name, f.size) for f in gstr2b_files] if gstr2b_files else []
+    cached_g2b_sigs = st.session_state.get('gstr2b_files_sigs', [])
     
+    # Detect file list change and invalidate cache immediately to prevent showing old data
+    if gstr2b_files and uploaded_g2b_sigs != cached_g2b_sigs:
+        if 'gstr2b_df_parsed' in st.session_state:
+            del st.session_state['gstr2b_df_parsed']
+        st.session_state['reco_executed'] = False
+        if 'reco_results' in st.session_state:
+            del st.session_state['reco_results']
+        if 'supplier_results' in st.session_state:
+            del st.session_state['supplier_results']
+            
     if gstr2b_files:
         st.markdown("### 🌐 GSTR-2B Statements")
         st.info(f"Selected {len(gstr2b_files)} JSON statement(s). Click below to parse and load them into memory.")
@@ -768,6 +779,19 @@ else:
         gstr2b_df = pd.DataFrame()
 
     # 2. Parse Uploaded Purchase Register
+    uploaded_books_sigs = [(f.name, f.size) for f in books_files] if books_files else []
+    cached_books_sigs = st.session_state.get('books_files_sigs', [])
+    
+    # Detect file list change and invalidate cache immediately to prevent showing old data
+    if books_files and uploaded_books_sigs != cached_books_sigs:
+        if 'books_df_parsed' in st.session_state:
+            del st.session_state['books_df_parsed']
+        st.session_state['reco_executed'] = False
+        if 'reco_results' in st.session_state:
+            del st.session_state['reco_results']
+        if 'supplier_results' in st.session_state:
+            del st.session_state['supplier_results']
+
     if books_files:
         for file in books_files:
             if file.name.lower().endswith('.xls'):
@@ -879,6 +903,7 @@ else:
                     if books_dfs:
                         books_df = pd.concat(books_dfs, ignore_index=True)
                         st.session_state['books_df_parsed'] = books_df
+                        st.session_state['books_files_sigs'] = uploaded_books_sigs
                         st.success(f"Successfully loaded {len(books_files)} Purchase Register file(s) ({len(books_df)} total records).")
                         # Clear reconciliation state to force recalculation on new data
                         st.session_state['reco_executed'] = False
@@ -894,6 +919,8 @@ else:
     # If Purchase Register files uploader is cleared, wipe cached data
     if not books_files and 'books_df_parsed' in st.session_state:
         del st.session_state['books_df_parsed']
+        if 'books_files_sigs' in st.session_state:
+            del st.session_state['books_files_sigs']
         st.session_state['reco_executed'] = False
         if 'reco_results' in st.session_state:
             del st.session_state['reco_results']
