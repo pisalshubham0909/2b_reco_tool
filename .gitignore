@@ -1,0 +1,26 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Streamlit configurations
+.streamlit/*
+!.streamlit/config.toml
+
+# Ignore sensitive financial/tax data files (Crucial for Privacy!)
+*.xlsx
+*.xls
+*.csv
+*.json
+*.pdf
+
+# Ignore system files
+.DS_Store
+Thumbs.db
