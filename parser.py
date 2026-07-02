@@ -118,6 +118,16 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
     if not isinstance(data, dict):
         raise ValueError("Invalid GSTR-2B JSON structure: Root element must be a dictionary/object.")
 
+    # Helper function to recursively lowercase all dictionary keys to resolve portal casing discrepancies
+    def lowercase_keys_recursive(d):
+        if isinstance(d, list):
+            return [lowercase_keys_recursive(v) for v in d]
+        if isinstance(d, dict):
+            return {k.lower(): lowercase_keys_recursive(v) for k, v in d.items()}
+        return d
+
+    data = lowercase_keys_recursive(data)
+
     # Attempt to extract return period and recipient GSTIN
     rtn_period = data.get('rtnprd') or data.get('fp')
     recipient_gstin = data.get('gstin') or data.get('rcptgstin')
@@ -150,7 +160,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
     b2b_list = get_json_section(data, 'b2b')
     for supplier in b2b_list:
         ctin = supplier.get('ctin', '').strip().upper()
-        cname = supplier.get('lglNm') or supplier.get('trdNm') or ""
+        cname = supplier.get('lglnm') or supplier.get('trdnm') or ""
         doc_list = get_doc_list(supplier)
         
         for inv in doc_list:
@@ -161,7 +171,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             pos = inv.get('pos') or ""
             rchrg = inv.get('rchrg') or inv.get('rc') or 'N'
             filing_date = inv.get('flddt') or inv.get('fld_dt') or inv.get('filing_date') or ""
-            gstr3b_status = inv.get('g3bfil') or inv.get('g3bFilingStatus') or inv.get('g3bStatus') or 'N'
+            gstr3b_status = inv.get('g3bfil') or inv.get('g3bfilingstatus') or inv.get('g3bstatus') or 'N'
             
             items = inv.get('items', [])
             txval = sum(float(item.get('txval', 0.0)) for item in items)
@@ -201,7 +211,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
     b2ba_list = get_json_section(data, 'b2ba')
     for supplier in b2ba_list:
         ctin = supplier.get('ctin', '').strip().upper()
-        cname = supplier.get('lglNm') or supplier.get('trdNm') or ""
+        cname = supplier.get('lglnm') or supplier.get('trdnm') or ""
         doc_list = get_doc_list(supplier)
         
         for inv in doc_list:
@@ -214,7 +224,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             pos = inv.get('pos') or ""
             rchrg = inv.get('rchrg') or inv.get('rc') or 'N'
             filing_date = inv.get('flddt') or inv.get('fld_dt') or inv.get('filing_date') or ""
-            gstr3b_status = inv.get('g3bfil') or inv.get('g3bFilingStatus') or inv.get('g3bStatus') or 'N'
+            gstr3b_status = inv.get('g3bfil') or inv.get('g3bfilingstatus') or inv.get('g3bstatus') or 'N'
             
             items = inv.get('items', [])
             txval = sum(float(item.get('txval', 0.0)) for item in items)
@@ -254,7 +264,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
     cdnr_list = get_json_section(data, 'cdnr')
     for supplier in cdnr_list:
         ctin = supplier.get('ctin', '').strip().upper()
-        cname = supplier.get('lglNm') or supplier.get('trdNm') or ""
+        cname = supplier.get('lglnm') or supplier.get('trdnm') or ""
         doc_list = get_doc_list(supplier)
         
         for nt in doc_list:
@@ -266,7 +276,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             pos = nt.get('pos') or ""
             rchrg = nt.get('rchrg') or nt.get('rc') or 'N'
             filing_date = nt.get('flddt') or nt.get('fld_dt') or nt.get('filing_date') or ""
-            gstr3b_status = nt.get('g3bfil') or nt.get('g3bFilingStatus') or nt.get('g3bStatus') or 'N'
+            gstr3b_status = nt.get('g3bfil') or nt.get('g3bfilingstatus') or nt.get('g3bstatus') or 'N'
             
             items = nt.get('items', [])
             txval = sum(float(item.get('txval', 0.0)) for item in items)
@@ -310,7 +320,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
     cdnra_list = get_json_section(data, 'cdnra')
     for supplier in cdnra_list:
         ctin = supplier.get('ctin', '').strip().upper()
-        cname = supplier.get('lglNm') or supplier.get('trdNm') or ""
+        cname = supplier.get('lglnm') or supplier.get('trdnm') or ""
         doc_list = get_doc_list(supplier)
         
         for nt in doc_list:
@@ -324,7 +334,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             pos = nt.get('pos') or ""
             rchrg = nt.get('rchrg') or nt.get('rc') or 'N'
             filing_date = nt.get('flddt') or nt.get('fld_dt') or nt.get('filing_date') or ""
-            gstr3b_status = nt.get('g3bfil') or nt.get('g3bFilingStatus') or nt.get('g3bStatus') or 'N'
+            gstr3b_status = nt.get('g3bfil') or nt.get('g3bfilingstatus') or nt.get('g3bstatus') or 'N'
             
             items = nt.get('items', [])
             txval = sum(float(item.get('txval', 0.0)) for item in items)
@@ -367,7 +377,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
     isd_list = get_json_section(data, 'isd')
     for supplier in isd_list:
         ctin = supplier.get('ctin', '').strip().upper()
-        cname = supplier.get('lglNm') or supplier.get('trdNm') or ""
+        cname = supplier.get('lglnm') or supplier.get('trdnm') or ""
         doc_list = get_doc_list(supplier)
         
         for inv in doc_list:
@@ -377,7 +387,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             itcelg = inv.get('itcelg', 'Y').strip().upper()
             pos = inv.get('pos') or ""
             filing_date = inv.get('flddt') or inv.get('fld_dt') or inv.get('filing_date') or ""
-            gstr3b_status = inv.get('g3bfil') or inv.get('g3bFilingStatus') or inv.get('g3bStatus') or 'Y'
+            gstr3b_status = inv.get('g3bfil') or inv.get('g3bfilingstatus') or inv.get('g3bstatus') or 'Y'
             
             # ISD distribution values may be split rate-wise, sum them up
             items = inv.get('items', [])
@@ -426,7 +436,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
     isda_list = get_json_section(data, 'isda')
     for supplier in isda_list:
         ctin = supplier.get('ctin', '').strip().upper()
-        cname = supplier.get('lglNm') or supplier.get('trdNm') or ""
+        cname = supplier.get('lglnm') or supplier.get('trdnm') or ""
         doc_list = get_doc_list(supplier)
         
         for inv in doc_list:
@@ -438,7 +448,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             itcelg = inv.get('itcelg', 'Y').strip().upper()
             pos = inv.get('pos') or ""
             filing_date = inv.get('flddt') or inv.get('fld_dt') or inv.get('filing_date') or ""
-            gstr3b_status = inv.get('g3bfil') or inv.get('g3bFilingStatus') or inv.get('g3bStatus') or 'Y'
+            gstr3b_status = inv.get('g3bfil') or inv.get('g3bfilingstatus') or inv.get('g3bstatus') or 'Y'
             
             items = inv.get('items', [])
             txval = sum(float(item.get('txval', 0.0)) for item in items)
@@ -533,7 +543,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
         
         # SEZ imports usually have the actual SEZ supplier's GSTIN
         ctin = (boe.get('ctin') or boe.get('gstin') or 'SEZ-IMPORT').strip().upper()
-        cname = boe.get('lglNm') or boe.get('trdNm') or "SEZ Supplier"
+        cname = boe.get('lglnm') or boe.get('trdnm') or "SEZ Supplier"
         pos = boe.get('pos') or ""
 
         documents.append({

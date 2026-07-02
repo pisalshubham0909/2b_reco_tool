@@ -11,8 +11,7 @@ The following files in this directory have been updated:
 ### 1. `reconciliation.py`
 *   **Consolidated Exporter**: Rebuilt the openpyxl exporter to output all matched, mismatched, and unmatched records into a single worksheet tab named **`Reconciliation Report`**, side-by-side with complete remarks and compliance laws, rather than split tabs.
 *   **Multiple Purchase Registers**: Configure the uploader to accept multiple files simultaneously (`accept_multiple_files=True`), and automatically parse, merge, and track source filenames for all uploaded records.
-*   **Excel Upload fallbacks**: Added checks to handle legacy `.xls` sheet formats via `pandas`/`xlrd` and standard `.xlsx` files below 10MB using pandas direct reading to avoid stream pointer conflicts.
-*   **Column Auto-Mapping**: Auto-detects column headers for GSTIN, invoice dates, and taxable values, rendering them directly in the Streamlit Interactive Explorer.
+*   **Interactive Grid Columns**: Added missing GSTR-2B columns directly to the dashboard grid (`gstr2b_supplier_name` (Portal Supplier Name), `gstr2b_cess` (Portal Cess), `gstr2b_total_val` (Portal Doc Value)). Styled and formatted all grid columns with custom headers, numeric precision, and status highlighting.
 *   **Interactive Mapper UI**: Display user selections for *every* PR column (including PR Period). Auto-populate using updated dictionary mappings.
 *   **Standard PR Template Exporter**: Added a button to download a standard, pre-formatted Excel template featuring the exact requested columns (Entity GSTIN, Place of Supply, Document Type, Document No, Document Date, Document Value, Transaction Type, Reported Period, Vendor GSTIN, Vendor POS, Taxable Value, GST Rate, IGST, CGST, SGST, Cess Amount, Cess Rate, Remarks, Other Remarks).
 *   **Supplier Summary Grid & Plotly Charts**: Added Plotly bar charts analyzing suppliers with high ITC variance and match rates, and rendered progress indicators for match percentages.
@@ -20,6 +19,7 @@ The following files in this directory have been updated:
 *   **Concurrency Safe**: Bypassed disk caches, using in-memory Byte IO streams to safely scale to 100+ concurrent users.
 
 ### 2. `parser.py`
+*   **Case-Insensitive JSON Parser**: Automatically converts all GSTR-2B JSON keys recursively to lowercase (`lowercase_keys_recursive`). This prevents case mismatch issues (such as portal files having `B2B`, `INUM`, or `CTIN` in uppercase) from rendering files empty.
 *   **Streaming Loader**: Processes large spreadsheets row-by-row in `read_only=True` mode using openpyxl, preventing memory crashes on large files.
 *   **Extended GSTR-2B Fields**: Added parsing and normalization logic for ISD distributions (`isd`/`isda` arrays), SEZ imports (`impgsez`), reverse charge (`rchrg`/`rc` flags), Place of Supply (`pos`), GSTR-1 filing date (`flddt`), and GSTR-3B status (`g3bfil`).
 *   **CEC and IDT Auto-Mapping**: Added `'cec'` to **Cess** detection patterns, and configured the detector search threshold to support 3-character sub-string lookups.

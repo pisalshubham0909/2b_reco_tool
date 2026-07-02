@@ -1163,26 +1163,69 @@ if 'reco_executed' in st.session_state and st.session_state['reco_executed']:
                     col_order_list.append('gst_law_remark')
                     
                 col_order_list.extend([
-                    'books_gstin', 'books_doc_num', 'books_doc_date', 'books_taxable_val', 'books_igst', 'books_cgst', 'books_sgst'
+                    'books_gstin', 'books_supplier_name', 'books_doc_num', 'books_doc_date', 
+                    'books_taxable_val', 'books_igst', 'books_cgst', 'books_sgst', 'books_cess', 'books_total_val'
                 ])
                 
                 if show_compliance_cols:
                     col_order_list.extend(['books_pos', 'books_rchrg', 'books_pr_period'])
                     
                 col_order_list.extend([
-                    'gstr2b_gstin', 'gstr2b_doc_num', 'gstr2b_doc_date', 'gstr2b_taxable_val', 'gstr2b_igst', 'gstr2b_cgst', 'gstr2b_sgst'
+                    'gstr2b_gstin', 'gstr2b_supplier_name', 'gstr2b_doc_num', 'gstr2b_doc_date', 
+                    'gstr2b_taxable_val', 'gstr2b_igst', 'gstr2b_cgst', 'gstr2b_sgst', 'gstr2b_cess', 'gstr2b_total_val'
                 ])
                 
                 if show_compliance_cols:
                     col_order_list.extend(['gstr2b_pos', 'gstr2b_rchrg', 'gstr2b_itc_eligibility', 'gstr2b_filing_date', 'gstr2b_gstr3b_status', 'gstr2b_section'])
                     
                 col_order_list.extend([
-                    'taxable_val_diff', 'igst_diff'
+                    'taxable_val_diff', 'igst_diff', 'cgst_diff', 'sgst_diff', 'cess_diff', 'days_diff'
                 ])
                 
                 st.dataframe(
                     df_disp.style.apply(highlight_status, axis=1),
                     column_order=col_order_list,
+                    column_config={
+                        "reco_status": "Matching Status",
+                        "itc_action": "ITC Action",
+                        "remarks": "Reconciliation Remarks",
+                        "gst_law_remark": "CGST Compliance Laws",
+                        "books_gstin": "Books GSTIN",
+                        "books_supplier_name": "Books Supplier Name",
+                        "books_doc_num": "Books Doc No",
+                        "books_doc_date": "Books Doc Date",
+                        "books_taxable_val": st.column_config.NumberColumn("Books Taxable (₹)", format="%.2f"),
+                        "books_igst": st.column_config.NumberColumn("Books IGST (₹)", format="%.2f"),
+                        "books_cgst": st.column_config.NumberColumn("Books CGST (₹)", format="%.2f"),
+                        "books_sgst": st.column_config.NumberColumn("Books SGST (₹)", format="%.2f"),
+                        "books_cess": st.column_config.NumberColumn("Books Cess (₹)", format="%.2f"),
+                        "books_total_val": st.column_config.NumberColumn("Books Doc Value (₹)", format="%.2f"),
+                        "books_pos": "Books POS",
+                        "books_rchrg": "Books RCM",
+                        "books_pr_period": "PR Period",
+                        "gstr2b_gstin": "Portal GSTIN",
+                        "gstr2b_supplier_name": "Portal Supplier Name",
+                        "gstr2b_doc_num": "Portal Doc No",
+                        "gstr2b_doc_date": "Portal Doc Date",
+                        "gstr2b_taxable_val": st.column_config.NumberColumn("Portal Taxable (₹)", format="%.2f"),
+                        "gstr2b_igst": st.column_config.NumberColumn("Portal IGST (₹)", format="%.2f"),
+                        "gstr2b_cgst": st.column_config.NumberColumn("Portal CGST (₹)", format="%.2f"),
+                        "gstr2b_sgst": st.column_config.NumberColumn("Portal SGST (₹)", format="%.2f"),
+                        "gstr2b_cess": st.column_config.NumberColumn("Portal Cess (₹)", format="%.2f"),
+                        "gstr2b_total_val": st.column_config.NumberColumn("Portal Doc Value (₹)", format="%.2f"),
+                        "gstr2b_pos": "Portal POS",
+                        "gstr2b_rchrg": "Portal RCM",
+                        "gstr2b_itc_eligibility": "ITC Eligibility",
+                        "gstr2b_filing_date": "Portal Filing Date",
+                        "gstr2b_gstr3b_status": "GSTR-3B Status",
+                        "gstr2b_section": "Portal Section",
+                        "taxable_val_diff": st.column_config.NumberColumn("Taxable Diff (₹)", format="%.2f"),
+                        "igst_diff": st.column_config.NumberColumn("IGST Diff (₹)", format="%.2f"),
+                        "cgst_diff": st.column_config.NumberColumn("CGST Diff (₹)", format="%.2f"),
+                        "sgst_diff": st.column_config.NumberColumn("SGST Diff (₹)", format="%.2f"),
+                        "cess_diff": st.column_config.NumberColumn("Cess Diff (₹)", format="%.2f"),
+                        "days_diff": st.column_config.NumberColumn("Days Diff", format="%d")
+                    },
                     use_container_width=True,
                     height=500
                 )
