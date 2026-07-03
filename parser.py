@@ -886,9 +886,28 @@ def parse_gstr2b_excel(file_path_or_obj):
     sheet_names_lower = {name.lower().strip(): name for name in wb.sheetnames}
     
     for key, config in sheet_configs.items():
-        if key in sheet_names_lower:
-            actual_sheet_name = sheet_names_lower[key]
-            ws = wb[actual_sheet_name]
+        matched_sheet = None
+        for name_lower, actual_name in sheet_names_lower.items():
+            # Match config key as substring of sheet name case-insensitively, avoiding false matches
+            if key == 'b2b':
+                if 'b2b' in name_lower and 'b2ba' not in name_lower:
+                    matched_sheet = actual_name
+                    break
+            elif key == 'cdnr':
+                if ('cdnr' in name_lower or 'credit' in name_lower or 'debit' in name_lower or 'note' in name_lower) and 'cdnra' not in name_lower:
+                    matched_sheet = actual_name
+                    break
+            elif key == 'impg':
+                if ('impg' in name_lower or 'import' in name_lower) and 'impgsez' not in name_lower and 'sez' not in name_lower:
+                    matched_sheet = actual_name
+                    break
+            else:
+                if key in name_lower:
+                    matched_sheet = actual_name
+                    break
+                    
+        if matched_sheet:
+            ws = wb[matched_sheet]
             
             # Find the header row by searching first 20 rows
             header_row_idx = None
@@ -899,7 +918,8 @@ def parse_gstr2b_excel(file_path_or_obj):
                 if r_idx > 20:
                     break
                 row_str = [str(x).lower().strip() if x is not None else "" for x in row]
-                if any('gstin' in s or 'invoice number' in s or 'invoice no' in s or 'bill of entry' in s or 'boe no' in s or 'note number' in s or 'note no' in s for s in row_str):
+                # Look for header indicators
+                if any('gstin' in s or 'ctin' in s or 'gst' in s or 'invoice' in s or 'doc' in s or 'bill' in s or 'boe' in s or 'note' in s for s in row_str):
                     header_row_idx = r_idx
                     headers = [str(x).strip() for x in row]
                     break
@@ -922,58 +942,58 @@ def parse_gstr2b_excel(file_path_or_obj):
                     if col_idx < len(row) and col_name:
                         row_dict[col_name.lower().strip()] = row[col_idx]
                         
-                # Extract fields using flexible keyword/substring matches
-                ctin_col = next((k for k in row_dict.keys() if 'gstin' in k or 'supplier gstin' in k), None)
+                # Extract fields using extremely flexible keyword/substring matches
+                ctin_col = next((k for k in row_dict.keys() if 'gstin' in k or 'ctin' in k or 'gst' in k), None)
                 ctin = str(row_dict.get(ctin_col or '')).strip().upper() if ctin_col else ''
                 if not ctin or ctin.lower() in ('none', 'total', 'grand total'):
                     continue
                     
-                name_col = next((k for k in row_dict.keys() if 'name' in k or 'legal name' in k or 'trade name' in k), None)
+                name_col = next((k for k in row_dict.keys() if 'name' in k or 'trade' in k or 'legal' in k or 'supplier' in k), None)
                 cname = str(row_dict.get(name_col or '')).strip() if name_col else ''
                 
-                inum_col = next((k for k in row_dict.keys() if 'invoice number' in k or 'invoice no' in k or 'document number' in k or 'document no' in k or 'boe number' in k or 'boe no' in k or 'nt_num' in k or 'note number' in k or 'note no' in k), None)
+                inum_col = next((k for k in row_dict.keys() if 'number' in k or 'no' in k or 'num' in k or 'boe' in k or 'invoice' in k or 'document' in k or 'nt_num' in k or 'note number' in k or 'note no' in k), None)
                 inum = str(row_dict.get(inum_col or '')).strip() if inum_col else ''
                 if not inum or inum.lower() in ('none', ''):
                     continue
                     
-                idt_col = next((k for k in row_dict.keys() if 'date' in k or 'idt' in k or 'boe date' in k), None)
+                idt_col = next((k for k in row_dict.keys() if 'date' in k or 'dt' in k), None)
                 idt = row_dict.get(idt_col or '') if idt_col else None
                 
-                val_col = next((k for k in row_dict.keys() if 'value' in k or 'invoice value' in k or 'document value' in k or 'boe value' in k), None)
+                val_col = next((k for k in row_dict.keys() if 'value' in k or 'val' in k or 'amt' in k or 'amount' in k), None)
                 val = float(row_dict.get(val_col or 0.0) or 0.0) if val_col else 0.0
                 
-                pos_col = next((k for k in row_dict.keys() if 'place of supply' in k or 'pos' in k), None)
+                pos_col = next((k for k in row_dict.keys() if 'place' in k or 'pos' in k or 'supply' in k), None)
                 pos = str(row_dict.get(pos_col or '')).strip() if pos_col else ''
                 
-                rc_col = next((k for k in row_dict.keys() if 'reverse charge' in k or 'rcm' in k), None)
+                rc_col = next((k for k in row_dict.keys() if 'reverse' in k or 'rcm' in k or 'charge' in k or 'rc' in k), None)
                 rchrg = str(row_dict.get(rc_col or 'N')).strip().upper() if rc_col else 'N'
                 
-                txval_col = next((k for k in row_dict.keys() if 'taxable value' in k or 'taxable val' in k), None)
+                txval_col = next((k for k in row_dict.keys() if 'taxable' in k or 'txval' in k or 'tx_val' in k), None)
                 txval = float(row_dict.get(txval_col or 0.0) or 0.0) if txval_col else 0.0
                 
-                igst_col = next((k for k in row_dict.keys() if 'integrated tax' in k or 'igst' in k or 'integrated' in k), None)
+                igst_col = next((k for k in row_dict.keys() if 'integrated' in k or 'igst' in k or 'iamt' in k or 'int' in k), None)
                 igst = float(row_dict.get(igst_col or 0.0) or 0.0) if igst_col else 0.0
                 
-                cgst_col = next((k for k in row_dict.keys() if 'central tax' in k or 'cgst' in k or 'central' in k), None)
+                cgst_col = next((k for k in row_dict.keys() if 'central' in k or 'cgst' in k or 'camt' in k or 'cen' in k), None)
                 cgst = float(row_dict.get(cgst_col or 0.0) or 0.0) if cgst_col else 0.0
                 
-                sgst_col = next((k for k in row_dict.keys() if 'state tax' in k or 'sgst' in k or 'state' in k or 'ut tax' in k), None)
+                sgst_col = next((k for k in row_dict.keys() if 'state' in k or 'sgst' in k or 'samt' in k or 'utgst' in k or 'ut' in k), None)
                 sgst = float(row_dict.get(sgst_col or 0.0) or 0.0) if sgst_col else 0.0
                 
-                cess_col = next((k for k in row_dict.keys() if 'cess' in k), None)
+                cess_col = next((k for k in row_dict.keys() if 'cess' in k or 'csamt' in k), None)
                 cess = float(row_dict.get(cess_col or 0.0) or 0.0) if cess_col else 0.0
                 
-                itc_col = next((k for k in row_dict.keys() if 'itc eligibility' in k or 'itc availability' in k or 'itc' in k), None)
+                itc_col = next((k for k in row_dict.keys() if 'eligible' in k or 'eligibility' in k or 'availability' in k or 'itc' in k or 'avail' in k), None)
                 itcelg = str(row_dict.get(itc_col or 'Y')).strip().upper() if itc_col else 'Y'
                 itc_eligibility = 'Eligible' if 'ineligible' not in itcelg.lower() and itcelg in ('Y', 'YES', 'ELIGIBLE') else 'Ineligible'
                 
-                fld_col = next((k for k in row_dict.keys() if 'filing date' in k or 'flddt' in k or 'gstr-1 filing date' in k), None)
+                fld_col = next((k for k in row_dict.keys() if 'filing' in k or 'fld' in k or 'filed' in k), None)
                 filing_date = row_dict.get(fld_col or '') if fld_col else ''
                 
-                g3b_col = next((k for k in row_dict.keys() if 'gstr-3b' in k or '3b' in k or 'filing status' in k), None)
+                g3b_col = next((k for k in row_dict.keys() if 'gstr-3b' in k or '3b' in k or 'filing status' in k or 'status' in k), None)
                 gstr3b_status = 'Yes' if str(row_dict.get(g3b_col or 'N')).strip().upper() in ('Y', 'YES', 'FILED') else 'No'
                 
-                period_col = next((k for k in row_dict.keys() if 'period' in k or 'rtn_period' in k), None)
+                period_col = next((k for k in row_dict.keys() if 'period' in k or 'month' in k or 'year' in k or 'fp' in k or 'rtn' in k), None)
                 rtn_period = str(row_dict.get(period_col or '')).strip() if period_col else ''
                 
                 doc_type = config.get('doc_type', 'INV')

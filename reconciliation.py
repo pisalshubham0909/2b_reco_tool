@@ -592,6 +592,9 @@ st.title("💼 GSTR-2B Reconciliation Dashboard")
 st.markdown("Reconcile GSTR-2B auto-drafted statements against internal Purchase Registers under active GST Rules & Laws.")
 
 # Sidebar Configuration Controls
+if 'uploader_version' not in st.session_state:
+    st.session_state['uploader_version'] = 0
+
 with st.sidebar:
     st.header("⚙️ Reconciliation Settings")
     
@@ -618,9 +621,11 @@ with st.sidebar:
                         help="Allowable difference in IGST/CGST/SGST/Cess amounts between Books and Portal.")
                         
     st.markdown("---")
-    if st.button("🧹 Clear All Data", use_container_width=True):
+    if st.button("🔄 Reset Reconciliation (Clear All)", use_container_width=True):
+        new_version = st.session_state.get('uploader_version', 0) + 1
         for key in list(st.session_state.keys()):
             del st.session_state[key]
+        st.session_state['uploader_version'] = new_version
         st.rerun()
     
     cn_convention = st.selectbox(
@@ -638,6 +643,7 @@ with st.sidebar:
         "GSTR-2B Portal Statements (Excel / JSON - Up to 1GB)", 
         type=["xlsx", "xls", "json"], 
         accept_multiple_files=True,
+        key=f"gstr2b_uploader_{st.session_state['uploader_version']}",
         help="Upload one or multiple GSTR-2B Excel or JSON files downloaded directly from the GST Portal."
     )
     
@@ -646,6 +652,7 @@ with st.sidebar:
         "Purchase Register (Excel/CSV - Up to 1GB)", 
         type=["xlsx", "xls", "csv"], 
         accept_multiple_files=True,
+        key=f"books_uploader_{st.session_state['uploader_version']}",
         help="Upload one or multiple Purchase Register sheets."
     )
     
