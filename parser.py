@@ -185,7 +185,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
         for item in items:
             if not isinstance(item, dict):
                 continue
-            det = item.get('itm_det')
+            det = item.get('itm_det') or item.get('itmdet')
             if not isinstance(det, dict):
                 det = item
                 
@@ -951,7 +951,7 @@ def parse_gstr2b_excel(file_path_or_obj):
                 name_col = next((k for k in row_dict.keys() if 'name' in k or 'trade' in k or 'legal' in k or 'supplier' in k), None)
                 cname = str(row_dict.get(name_col or '')).strip() if name_col else ''
                 
-                inum_col = next((k for k in row_dict.keys() if 'number' in k or 'no' in k or 'num' in k or 'boe' in k or 'invoice' in k or 'document' in k or 'nt_num' in k or 'note number' in k or 'note no' in k), None)
+                inum_col = next((k for k in row_dict.keys() if 'invoice' in k or 'document' in k or 'doc num' in k or 'doc no' in k or 'note num' in k or 'note no' in k or 'boe num' in k or 'boe no' in k or k in ('inum', 'num', 'number', 'no')), None)
                 inum = str(row_dict.get(inum_col or '')).strip() if inum_col else ''
                 if not inum or inum.lower() in ('none', ''):
                     continue
@@ -977,7 +977,7 @@ def parse_gstr2b_excel(file_path_or_obj):
                 cgst_col = next((k for k in row_dict.keys() if 'central' in k or 'cgst' in k or 'camt' in k or 'cen' in k), None)
                 cgst = float(row_dict.get(cgst_col or 0.0) or 0.0) if cgst_col else 0.0
                 
-                sgst_col = next((k for k in row_dict.keys() if 'state' in k or 'sgst' in k or 'samt' in k or 'utgst' in k or 'ut' in k), None)
+                sgst_col = next((k for k in row_dict.keys() if 'sgst' in k or 'samt' in k or 'state/ut' in k or 'state tax' in k or 'utgst' in k), None)
                 sgst = float(row_dict.get(sgst_col or 0.0) or 0.0) if sgst_col else 0.0
                 
                 cess_col = next((k for k in row_dict.keys() if 'cess' in k or 'csamt' in k), None)
@@ -987,7 +987,7 @@ def parse_gstr2b_excel(file_path_or_obj):
                 itcelg = str(row_dict.get(itc_col or 'Y')).strip().upper() if itc_col else 'Y'
                 itc_eligibility = 'Eligible' if 'ineligible' not in itcelg.lower() and itcelg in ('Y', 'YES', 'ELIGIBLE') else 'Ineligible'
                 
-                fld_col = next((k for k in row_dict.keys() if 'filing' in k or 'fld' in k or 'filed' in k), None)
+                fld_col = next((k for k in row_dict.keys() if 'filing date' in k or 'filing dt' in k or 'flddt' in k or 'fld_dt' in k or 'filed date' in k), None)
                 filing_date = row_dict.get(fld_col or '') if fld_col else ''
                 
                 g3b_col = next((k for k in row_dict.keys() if 'gstr-3b' in k or '3b' in k or 'filing status' in k or 'status' in k), None)
