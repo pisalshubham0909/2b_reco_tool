@@ -1,60 +1,56 @@
-# WALKTHROUGH: GSTR-2B Reconciliation Tool Enhancements
+# WALKTHROUGH: Advanced GSTR-2B Reconciliation Tool
 
-This project has been updated with advanced features, performance optimizations, and robust spreadsheet processing mechanisms to achieve a seamless, 100% accurate reconciliation between your accounting books (Purchase Register) and the GST Portal GSTR-2B statements.
+This tool performs a 100% accurate, high-performance reconciliation between your accounting books (Purchase Register) and the GST Portal GSTR-2B statements. It incorporates multi-line invoice consolidation and an advanced 7-level matching engine.
 
 ---
 
-## 📂 File Structure & Updates
+## 📂 File Structure & Components
 
-The following files in this directory have been updated:
+The application is structured into three core modules:
 
-### 1. `reconciliation.py`
-*   **🔄 Reset Reconciliation (Clear All)**: Implemented dynamic uploader version tracking keys. Clicking the reset button increments the version key, which programmatically clears the file uploader inputs in the UI and wipes all cached variables in session state.
-*   **GSTR-2B Portal Excel Upload Support**: Configured GSTR-2B file uploader to accept Excel files directly (`type=["xlsx", "xls", "json"]`). Branches the parser to the new Excel scanner or JSON reader based on the file extension.
-*   **Consolidated Exporter (GSTR-2B First)**: Swapped columns layout in the openpyxl exporter. All matched, mismatched, and unmatched records are written to a single worksheet tab named **`Reconciliation Report`** with GSTR-2B columns positioned first on the left side, followed by Books columns on the right.
-*   **Interactive Grid Columns (GSTR-2B First)**: Rearranged the dashboard data table. Portal details (Supplier Name, Cess, Document Value, POS, RCM, filing periods, and ITC eligibility) are rendered first.
-*   **🧹 Complete Removal of Demo/Synthetic Data**: Removed the "Generate & Load Synthetic Data" button and any sandbox parameters to prevent mock data from loading, ensuring only your uploaded files are reconciled.
-*   **🏁 Auto-Parsing Fallback Loader**: If you forget to click the "Load" buttons, clicking "Run Reconciliation" automatically parses and loads uploaded files in the background.
-*   **🧹 Automatic Cache Invalidation**: Wipes cached parsed data and reconciliation results from memory immediately if the set of files in either uploader changes.
-*   **Standard PR Template Exporter**: Added a button to download a standard, pre-formatted Excel template featuring the exact requested columns (Entity GSTIN, Place of Supply, Document Type, Document No, Document Date, Document Value, Transaction Type, Reported Period, Vendor GSTIN, Vendor POS, Taxable Value, GST Rate, IGST, CGST, SGST, Cess Amount, Cess Rate, Remarks, Other Remarks).
-*   **Streamlit Hot Reloads**: Added `st.rerun()` calls to all uploader buttons to force immediate page updates.
+### 1. [reconciliation.py](file:///c:/Users/spisa/OneDrive/Automation%20folder/2B%20Reco%20Tool/reconciliation.py) / [app.py](file:///c:/Users/spisa/OneDrive/Automation%20folder/2B%20Reco%20Tool/app.py)
+*   **Web Dashboard**: Streamlit interface containing file uploaders, tolerance sliders (taxable value, date, tax, fuzzy matching sensitivity), metrics cards, charts, and filtering tables.
+*   **Single-Sheet Exporter**: Exports the compiled reconciliation results to a single openpyxl worksheet tab named **`Reconciliation Report`** with GSTR-2B columns positioned first on the left, followed by Books columns on the right. Status cells are highlighted dynamically.
+*   **Wiped Dead Code**: The unused synthetic generator has been removed, and the welcome message has been cleaned up.
 
-### 2. `parser.py`
-*   **parse_gstr2b_excel**: Direct support for standard Excel files downloaded from the GST Portal. Reads and normalizes B2B, B2BA, CDNR, CDNRA, ISD, IMPG, and IMPGSEZ sheets.
-*   **Case-Insensitive Sheet Substring Matching**: Matches sheets case-insensitively using substring search (e.g., matching `"b2b"` to `"B2B Invoices"`, or `"cdnr"` to `"Credit Debit Notes"`), avoiding false positives like matching `"b2b"` to `"b2ba"`.
-*   **Formatting-Robust Float Wrapper**: Overrode the built-in `float` function in `parser.py` to automatically strip currency symbols (₹, $), remove formatting commas (e.g. converting `"1,25,000.50"` into `125000.50`), and handle blank cells.
-*   **Case-Insensitive JSON Parser**: Automatically flattens standard GST Portal item details recursively from `'itm_det'` dictionaries and maps standard portal synonyms (like `iamt`/`igst`, `camt`/`cgst`, `samt`/`sgst`, `csamt`/`cess`).
-*   **Streaming Loader**: Processes large spreadsheets row-by-row in `read_only=True` mode using openpyxl, preventing memory crashes on large files.
-*   **Extended GSTR-2B Fields**: Added parsing and normalization logic for ISD distributions (`isd`/`isda` arrays), SEZ imports (`impgsez`), reverse charge (`rchrg`/`rc` flags), Place of Supply (`pos`), GSTR-1 filing date (`flddt`), and GSTR-3B status (`g3bfil`).
-*   **Synonym Updates**: Added synonyms to map template headers like `Document Date`, `Document Value`, and `Reported Period` automatically.
-*   **Document Type Normalizer**: Map various Excel strings to standard types (`INV`, `CRN` (Credit Note), `DBN` (Debit Note), `IMPG` (Import), `ISD` (Input Service Distributor)).
-*   **Clean Invoice Number**: Strip trailing float `.0`/`.00` suffixes and normalize punctuations/spaces before comparisons to resolve partial matches.
+### 2. [parser.py](file:///c:/Users/spisa/OneDrive/Automation%20folder/2B%20Reco%20Tool/parser.py)
+*   **GSTR-2B Excel & JSON Parsing**: Supports native GSTR-2B Excel spreadsheets (`parse_gstr2b_excel`) and JSON return files (`parse_gstr2b_json`). Matches tabs case-insensitively and flattens nested item records recursively.
+*   **Purchase Register Parsing**: Maps custom column headers dynamically (`parse_purchase_register`), handles credit notes, cleans invoice strings (strips spaces, dashes, leading zeros, and decimal suffixes), and formats monetary values robustly.
 
-### 3. `engine.py`
-*   **$O(N)$ Linear Matching Speedup**: Redesigned the matching loops to index records using compound tuple keys `(gstin, doc_type, clean_doc_num)` in memory-hashed dictionaries (`defaultdict`). This replaces slow pandas dataframe filtering inside loops with $O(1)$ lookups, cutting down 100,000-record matching times to under 2 seconds.
-*   **Flexible Matching Tolerances**:
-    *   Date differences and taxable value differences do not reject matches; they are matched and flagged in **`Remarks`**.
-    *   Added custom tax tolerance parameter (defaulting to ₹10) for IGST/CGST/SGST/Cess amounts.
-*   **GST Law Citation Engine**: Automatically matches regulations and generates references to the CGST Act (Section 17(5) for ineligible ITC, Section 9(3)/9(4) for RCM, Section 20 for ISD).
+### 3. [engine.py](file:///c:/Users/spisa/OneDrive/Automation%20folder/2B%20Reco%20Tool/engine.py)
+*   **Multi-Line Consolidation**: Groups split rows (e.g. rate-wise items) by `(supplier_gstin, doc_num, doc_type)` and sums up monetary values to ensure accurate document-level matches.
+*   **7-Level Reconciliation Engine**: Compares consolidated records using a cascading confidence hierarchy.
 
-### 4. `app.py`
-*   Kept in sync as an exact copy of `reconciliation.py` to ensure hot reload stability on all Streamlit Community Cloud configurations.
+---
+
+## ⚙️ The 7-Level Matching Strategy
+
+The reconciliation engine matches records sequentially, locking matches at each level before proceeding:
+
+1.  **Level 1: Exact Match**
+    Matches identical key fields `(GSTIN + Clean Invoice No + Doc Type)` where taxable values, taxes, and dates fall within their respective slider tolerances.
+2.  **Level 2: Exact Key Match with Mismatch**
+    Matches identical key fields, but flags a discrepancy (e.g. `Tax Mismatch`, `Value Mismatch`, or `Date Mismatch`) because one or more values exceed tolerance.
+3.  **Level 3: Suffix/Numeric Match**
+    Matches records where the invoice numbers are not exact matches, but their trailing numeric suffixes are identical (e.g., `INV/2026/0123` and `123`) and values match within tolerance.
+4.  **Level 4: Suffix/Numeric Match with Mismatch**
+    Same suffix-matching logic as Level 3, but flags a warning because value/tax/date differences exceed tolerance.
+5.  **Level 5: Amendment Match**
+    Performs lookups on GSTR-2B amended records (`b2ba` / `cdnra` sections) using original document numbers.
+6.  **Level 6: Fuzzy Match**
+    Uses fuzzy string comparison (`rapidfuzz.fuzz.ratio`) to match similar invoice numbers within the same supplier (similarity score $\ge$ threshold).
+7.  **Level 7: Value-based Match (Amount-based Match)**
+    Matches records with completely different invoice strings if they share the exact same GSTIN, Doc Type, Taxable Value, and Tax amounts.
 
 ---
 
 ## ⚡ How to Run the Tool
 
-1. Double-click the launcher script:
-   `run.bat`
-   *Or run via the terminal:*
-   `python -m streamlit run reconciliation.py --server.port 8501`
-
-2. Open your browser and navigate to:
-   **[http://localhost:8501](http://localhost:8501)**
-
-3. Load your files:
-   * **GSTR-2B**: Upload one or multiple official **Excel (.xlsx, .xls)** or **JSON (.json)** files downloaded from the GST Portal.
-   * **Purchase Register**: Upload one or multiple Excel (`.xlsx`, `.xls`) or CSV files at the same time.
-   * **PR Template**: Click **"Download PR Template"** to download the standard layout for reference.
-
-4. Click **"Run Reconciliation"** to view interactive KPI charts, download the consolidated report, and analyze status remarks.
+1.  Start the dashboard:
+    Double-click `run.bat` or run:
+    ```bash
+    python -m streamlit run reconciliation.py --server.port 8501
+    ```
+2.  Open **[http://localhost:8501](http://localhost:8501)** in your browser.
+3.  Upload your **GSTR-2B Excel or JSON** statements and **Purchase Register** file in the sidebar.
+4.  Map fields, adjust tolerances, and click **"Run Reconciliation"**.

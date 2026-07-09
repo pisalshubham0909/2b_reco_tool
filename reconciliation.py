@@ -99,231 +99,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Generate Synthetic Data function including new GST edge cases (RCM, ISD, SEZ, Late files)
-def get_synthetic_data():
-    # 1. Create GSTR-2B Data
-    gstr2b_json_content = {
-        "gstin": "27MYCOMPANY123Z0",
-        "rtnprd": "032026",
-        "b2b": [
-            {
-                "ctin": "27ABCDE1234F1Z5",
-                "lglNm": "Alpha Suppliers Ltd",
-                "inv": [
-                    {
-                        "inum": "INV-101",
-                        "idt": "10-03-2026",
-                        "val": 118000.0,
-                        "pos": "27",
-                        "rchrg": "N",
-                        "inv_typ": "R",
-                        "itcelg": "Y",
-                        "flddt": "11-04-2026",
-                        "g3bfil": "Y",
-                        "items": [{"num": 1, "rt": 18.0, "txval": 100000.0, "igst": 0.0, "cgst": 9000.0, "sgst": 9000.0, "cess": 0.0}]
-                    }
-                ]
-            },
-            {
-                "ctin": "27FGHIJ5678K2Z9",
-                "lglNm": "Beta Enterprise",
-                "inv": [
-                    {
-                        "inum": "INV-201",
-                        "idt": "15-03-2026",
-                        "val": 23600.0,
-                        "pos": "27",
-                        "rchrg": "N",
-                        "inv_typ": "R",
-                        "itcelg": "Y",
-                        "flddt": "10-04-2026",
-                        "g3bfil": "Y",
-                        "items": [{"num": 1, "rt": 18.0, "txval": 20000.0, "igst": 3600.0, "cgst": 0.0, "sgst": 0.0, "cess": 0.0}]
-                    },
-                    {
-                        "inum": "INV-202",
-                        "idt": "22-03-2026",
-                        "val": 11800.0,
-                        "pos": "27",
-                        "rchrg": "N",
-                        "inv_typ": "R",
-                        "itcelg": "Y",
-                        "flddt": "15-04-2026",
-                        "g3bfil": "N",  # GSTR-3B NOT FILED
-                        "items": [{"num": 1, "rt": 18.0, "txval": 10000.0, "igst": 0.0, "cgst": 900.0, "sgst": 900.0, "cess": 0.0}]
-                    }
-                ]
-            },
-            {
-                "ctin": "27KLMNO9012L3Z3",
-                "lglNm": "Gamma Corp",
-                "inv": [
-                    {
-                        "inum": "INV-301",
-                        "idt": "25-03-2026",
-                        "val": 118000.0,
-                        "pos": "27",
-                        "rchrg": "N",
-                        "inv_typ": "R",
-                        "itcelg": "N",  # Ineligible blocked ITC 17(5)
-                        "flddt": "09-04-2026",
-                        "g3bfil": "Y",
-                        "items": [{"num": 1, "rt": 18.0, "txval": 100000.0, "igst": 0.0, "cgst": 9000.0, "sgst": 9000.0, "cess": 0.0}]
-                    },
-                    {
-                        "inum": "INV-302",
-                        "idt": "28-03-2026",
-                        "val": 17700.0,
-                        "pos": "27",
-                        "rchrg": "N",
-                        "inv_typ": "R",
-                        "itcelg": "Y",  # Target for fuzzy matching (books has "INV302-A")
-                        "flddt": "11-04-2026",
-                        "g3bfil": "Y",
-                        "items": [{"num": 1, "rt": 18.0, "txval": 15000.0, "igst": 2700.0, "cgst": 0.0, "sgst": 0.0, "cess": 0.0}]
-                    }
-                ]
-            },
-            {
-                "ctin": "27PQRST3456M4Z1",
-                "lglNm": "Delta Logistics",
-                "inv": [
-                    {
-                        "inum": "INV-401",
-                        "idt": "29-03-2026",
-                        "val": 11800.0,
-                        "pos": "27",
-                        "rchrg": "Y",  # Reverse charge transaction
-                        "inv_typ": "R",
-                        "itcelg": "Y",
-                        "flddt": "10-04-2026",
-                        "g3bfil": "Y",
-                        "items": [{"num": 1, "rt": 18.0, "txval": 10000.0, "igst": 0.0, "cgst": 900.0, "sgst": 900.0, "cess": 0.0}]
-                    }
-                ]
-            }
-        ],
-        "b2ba": [
-            {
-                "ctin": "27ABCDE1234F1Z5",
-                "lglNm": "Alpha Suppliers Ltd",
-                "inv": [
-                    {
-                        "inum": "INV-99A",
-                        "idt": "15-03-2026",
-                        "oinum": "INV-99",
-                        "oidt": "10-02-2026",
-                        "val": 23600.0,
-                        "pos": "27",
-                        "rchrg": "N",
-                        "inv_typ": "R",
-                        "itcelg": "Y",
-                        "flddt": "11-04-2026",
-                        "g3bfil": "Y",
-                        "items": [{"num": 1, "rt": 18.0, "txval": 20000.0, "igst": 3600.0, "cgst": 0.0, "sgst": 0.0, "cess": 0.0}]
-                    }
-                ]
-            }
-        ],
-        "cdnr": [
-            {
-                "ctin": "27FGHIJ5678K2Z9",
-                "lglNm": "Beta Enterprise",
-                "nt": [
-                    {
-                        "nt_num": "CN-01",
-                        "nt_dt": "20-03-2026",
-                        "val": 5900.0,
-                        "nt_ty": "C",
-                        "inum": "INV-201",
-                        "idt": "15-03-2026",
-                        "itcelg": "Y",
-                        "pos": "27",
-                        "rchrg": "N",
-                        "flddt": "12-04-2026",
-                        "g3bfil": "Y",
-                        "items": [{"num": 1, "rt": 18.0, "txval": 5000.0, "igst": 900.0, "cgst": 0.0, "sgst": 0.0, "cess": 0.0}]
-                    }
-                ]
-            }
-        ],
-        "isd": [
-            {
-                "ctin": "27ISDHO9999A1Z2",
-                "lglNm": "HO Head Office (ISD)",
-                "doclist": [
-                    {
-                        "docnum": "ISD-88",
-                        "docdt": "13-03-2026",
-                        "val": 18000.0,
-                        "itcelg": "Y",
-                        "pos": "27",
-                        "flddt": "13-04-2026",
-                        "g3bfil": "Y",
-                        "items": [{"num": 1, "rt": 0.0, "txval": 18000.0, "igst": 18000.0, "cgst": 0.0, "sgst": 0.0, "cess": 0.0}]
-                    }
-                ]
-            }
-        ],
-        "impgsez": [
-            {
-                "boe_num": "BOE-SEZ-99",
-                "boe_dt": "19-03-2026",
-                "boe_val": 177000.0,
-                "txval": 150000.0,
-                "igst": 27000.0,
-                "cess": 0.0,
-                "itcelg": "Y",
-                "ctin": "27SEZDV8888B3Z4",
-                "lglNm": "SEZ Infrastructure Ltd",
-                "pos": "27"
-            }
-        ],
-        "impg": [
-            {
-                "boe_num": "BOE-501",
-                "boe_dt": "18-03-2026",
-                "boe_val": 500000.0,
-                "port_cd": "INBOM4",
-                "txval": 400000.0,
-                "igst": 72000.0,
-                "cess": 0.0,
-                "itcelg": "Y"
-            }
-        ]
-    }
-
-    # 2. Create Books Data
-    books_data = [
-        # B2B Matched
-        {"Supplier GSTIN": "27ABCDE1234F1Z5", "Supplier Name": "Alpha Suppliers Ltd", "Invoice Number": "INV-101", "Invoice Date": "10-03-2026", "Voucher Type": "Purchase", "Taxable Value": 100000.0, "IGST": 0.0, "CGST": 9000.0, "SGST": 9000.0, "POS": "27", "RCM": "No"},
-        # Amended Invoice Match
-        {"Supplier GSTIN": "27ABCDE1234F1Z5", "Supplier Name": "Alpha Suppliers Ltd", "Invoice Number": "INV-99", "Invoice Date": "10-02-2026", "Voucher Type": "Purchase", "Taxable Value": 20000.0, "IGST": 3600.0, "CGST": 0.0, "SGST": 0.0, "POS": "27", "RCM": "No"},
-        # Rounded value mismatch within tolerance (₹2 difference)
-        {"Supplier GSTIN": "27FGHIJ5678K2Z9", "Supplier Name": "Beta Enterprise", "Invoice Number": "INV-201", "Invoice Date": "15-03-2026", "Voucher Type": "Purchase", "Taxable Value": 20002.0, "IGST": 3600.36, "CGST": 0.0, "SGST": 0.0, "POS": "27", "RCM": "No"},
-        # GSTR-3B Unfiled check
-        {"Supplier GSTIN": "27FGHIJ5678K2Z9", "Supplier Name": "Beta Enterprise", "Invoice Number": "INV-202", "Invoice Date": "22-03-2026", "Voucher Type": "Purchase", "Taxable Value": 10000.0, "IGST": 0.0, "CGST": 900.0, "SGST": 900.0, "POS": "27", "RCM": "No"},
-        # Only in books invoice
-        {"Supplier GSTIN": "27FGHIJ5678K2Z9", "Supplier Name": "Beta Enterprise", "Invoice Number": "INV-203", "Invoice Date": "24-03-2026", "Voucher Type": "Purchase", "Taxable Value": 30000.0, "IGST": 5400.0, "CGST": 0.0, "SGST": 0.0, "POS": "27", "RCM": "No"},
-        # Blocked ITC Match
-        {"Supplier GSTIN": "27KLMNO9012L3Z3", "Supplier Name": "Gamma Corp", "Invoice Number": "INV-301", "Invoice Date": "25-03-2026", "Voucher Type": "Purchase", "Taxable Value": 100000.0, "IGST": 0.0, "CGST": 9000.0, "SGST": 9000.0, "POS": "27", "RCM": "No"},
-        # Fuzzy match target: books has "INV302-A", JSON has "INV-302"
-        {"Supplier GSTIN": "27KLMNO9012L3Z3", "Supplier Name": "Gamma Corp", "Invoice Number": "INV302-A", "Invoice Date": "28-03-2026", "Voucher Type": "Purchase", "Taxable Value": 15000.0, "IGST": 2700.0, "CGST": 0.0, "SGST": 0.0, "POS": "27", "RCM": "No"},
-        # RCM match
-        {"Supplier GSTIN": "27PQRST3456M4Z1", "Supplier Name": "Delta Logistics", "Invoice Number": "INV-401", "Invoice Date": "29-03-2026", "Voucher Type": "Purchase", "Taxable Value": 10000.0, "IGST": 0.0, "CGST": 900.0, "SGST": 900.0, "POS": "27", "RCM": "Yes"},
-        # Credit Note
-        {"Supplier GSTIN": "27FGHIJ5678K2Z9", "Supplier Name": "Beta Enterprise", "Invoice Number": "CN-01", "Invoice Date": "20-03-2026", "Voucher Type": "Credit Note", "Taxable Value": 5000.0, "IGST": 900.0, "CGST": 0.0, "SGST": 0.0, "POS": "27", "RCM": "No"},
-        # ISD distribution match
-        {"Supplier GSTIN": "27ISDHO9999A1Z2", "Supplier Name": "HO Head Office (ISD)", "Invoice Number": "ISD-88", "Invoice Date": "13-03-2026", "Voucher Type": "ISD Journal", "Taxable Value": 18000.0, "IGST": 18000.0, "CGST": 0.0, "SGST": 0.0, "POS": "27", "RCM": "No"},
-        # SEZ Import match
-        {"Supplier GSTIN": "27SEZDV8888B3Z4", "Supplier Name": "SEZ Infrastructure Ltd", "Invoice Number": "BOE-SEZ-99", "Invoice Date": "19-03-2026", "Voucher Type": "Import SEZ", "Taxable Value": 150000.0, "IGST": 27000.0, "CGST": 0.0, "SGST": 0.0, "POS": "27", "RCM": "No"},
-        # Import matching
-        {"Supplier GSTIN": "IMPORT", "Supplier Name": "Import of Goods", "Invoice Number": "BOE-501", "Invoice Date": "18-03-2026", "Voucher Type": "Import BOE", "Taxable Value": 400000.0, "IGST": 72000.0, "CGST": 0.0, "SGST": 0.0, "POS": "97", "RCM": "No"}
-    ]
-    df_books = pd.DataFrame(books_data)
-    
-    return gstr2b_json_content, df_books
-
 # openpyxl Styled Excel Exporter to a Single Consolidated Sheet + Dashboard + Supplier Summary
 def export_reco_to_excel(df_reco, df_supplier, summary_stats):
     wb = Workbook()
@@ -342,10 +117,15 @@ def export_reco_to_excel(df_reco, df_supplier, summary_stats):
         'Matched': matched_fill,
         'Fuzzy Match': matched_fill,
         'Matched (Amended)': matched_fill,
+        'Matched (Value-based)': matched_fill,
         'Value Mismatch': mismatch_fill,
         'Date Mismatch': mismatch_fill,
         'Date & Value Mismatch': mismatch_fill,
         'Value Mismatch (Amended)': mismatch_fill,
+        'Tax Mismatch': mismatch_fill,
+        'Tax Mismatch (Fuzzy)': mismatch_fill,
+        'Value Mismatch (Fuzzy)': mismatch_fill,
+        'Tax Mismatch (Amended)': mismatch_fill,
         'Only in Books': books_fill,
         'Only in GSTR-2B': gstr2b_fill
     }
@@ -1029,7 +809,7 @@ if 'reco_executed' in st.session_state and st.session_state['reco_executed']:
         
         # Matches count
         total_rows = len(df_reco)
-        matched_rows = df_reco[df_reco['reco_status'].isin(['Matched', 'Fuzzy Match', 'Matched (Amended)'])].shape[0]
+        matched_rows = df_reco[df_reco['reco_status'].isin(['Matched', 'Fuzzy Match', 'Matched (Amended)', 'Matched (Value-based)'])].shape[0]
         mismatch_rows = df_reco[df_reco['reco_status'].str.contains('Mismatch', na=False)].shape[0]
         only_books_rows = df_reco[df_reco['reco_status'] == 'Only in Books'].shape[0]
         only_2b_rows = df_reco[df_reco['reco_status'] == 'Only in GSTR-2B'].shape[0]
@@ -1187,7 +967,7 @@ if 'reco_executed' in st.session_state and st.session_state['reco_executed']:
             df_filtered = df_filtered[(df_filtered['books_gstin'] == gstin_filter) | (df_filtered['gstr2b_gstin'] == gstin_filter)]
             
         if status_filter == "Matched / Fuzzy Match":
-            df_filtered = df_filtered[df_filtered['reco_status'].isin(['Matched', 'Fuzzy Match', 'Matched (Amended)'])]
+            df_filtered = df_filtered[df_filtered['reco_status'].isin(['Matched', 'Fuzzy Match', 'Matched (Amended)', 'Matched (Value-based)'])]
         elif status_filter == "Discrepancy / Mismatch":
             df_filtered = df_filtered[df_filtered['reco_status'].str.contains('Mismatch', na=False)]
         elif status_filter == "Only in Books":
@@ -1212,7 +992,7 @@ if 'reco_executed' in st.session_state and st.session_state['reco_executed']:
         # Color coding rows
         def highlight_status(row):
             status = row['reco_status']
-            if status in ('Matched', 'Fuzzy Match', 'Matched (Amended)'):
+            if status in ('Matched', 'Fuzzy Match', 'Matched (Amended)', 'Matched (Value-based)'):
                 return ['background-color: rgba(16, 185, 129, 0.08)'] * len(row)
             elif 'Mismatch' in status:
                 return ['background-color: rgba(245, 158, 11, 0.08)'] * len(row)
@@ -1380,4 +1160,4 @@ if 'reco_executed' in st.session_state and st.session_state['reco_executed']:
             else:
                 st.info("No supplier summaries available.")
 else:
-    st.info("👋 Welcome! Please upload GSTR-2B JSON files and your Purchase Register in the sidebar, or click the **Generate & Load Synthetic Data** button to explore the dashboard immediately.")
+    st.info("👋 Welcome! Please upload GSTR-2B files and your Purchase Register in the sidebar to run the reconciliation dashboard.")
