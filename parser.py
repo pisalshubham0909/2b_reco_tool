@@ -214,7 +214,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             filing_date = inv.get('flddt') or inv.get('fld_dt') or inv.get('filing_date') or ""
             gstr3b_status = inv.get('g3bfil') or inv.get('g3bfilingstatus') or inv.get('g3bstatus') or 'N'
             
-            items = inv.get('items', [])
+            items = inv.get('items') or inv.get('itms') or []
             txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             documents.append({
@@ -263,7 +263,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             filing_date = inv.get('flddt') or inv.get('fld_dt') or inv.get('filing_date') or ""
             gstr3b_status = inv.get('g3bfil') or inv.get('g3bfilingstatus') or inv.get('g3bstatus') or 'N'
             
-            items = inv.get('items', [])
+            items = inv.get('items') or inv.get('itms') or []
             txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             documents.append({
@@ -311,7 +311,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             filing_date = nt.get('flddt') or nt.get('fld_dt') or nt.get('filing_date') or ""
             gstr3b_status = nt.get('g3bfil') or nt.get('g3bfilingstatus') or nt.get('g3bstatus') or 'N'
             
-            items = nt.get('items', [])
+            items = nt.get('items') or nt.get('itms') or []
             txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             # Credit notes represent negative values (ITC reduction)
@@ -365,7 +365,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             filing_date = nt.get('flddt') or nt.get('fld_dt') or nt.get('filing_date') or ""
             gstr3b_status = nt.get('g3bfil') or nt.get('g3bfilingstatus') or nt.get('g3bstatus') or 'N'
             
-            items = nt.get('items', [])
+            items = nt.get('items') or nt.get('itms') or []
             txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             sign = -1.0 if nt_ty == 'C' else 1.0
@@ -415,7 +415,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             gstr3b_status = inv.get('g3bfil') or inv.get('g3bfilingstatus') or inv.get('g3bstatus') or 'Y'
             
             # ISD distribution values may be split rate-wise, sum them up
-            items = inv.get('items', [])
+            items = inv.get('items') or inv.get('itms') or []
             txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             # Fallback if items are missing
@@ -471,7 +471,7 @@ def parse_gstr2b_json(json_content_or_path, file_name="GSTR2B.json"):
             filing_date = inv.get('flddt') or inv.get('fld_dt') or inv.get('filing_date') or ""
             gstr3b_status = inv.get('g3bfil') or inv.get('g3bfilingstatus') or inv.get('g3bstatus') or 'Y'
             
-            items = inv.get('items', [])
+            items = inv.get('items') or inv.get('itms') or []
             txval, igst, cgst, sgst, cess = extract_tax_from_items(items)
             
             if not items:
