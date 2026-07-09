@@ -695,7 +695,7 @@ def parse_purchase_register(file_path_or_buffer, col_mapping, sheet_name=None, c
     if gst_col and gst_col in df_raw.columns:
         df['supplier_gstin'] = df_raw[gst_col].astype(str).str.strip().str.upper()
     else:
-        df['supplier_gstin'] = 'UNKNOWN'
+        raise ValueError("Supplier GSTIN column mapping is required.")
         
     # Map Document Number
     num_col = col_mapping.get('doc_num')
@@ -710,7 +710,7 @@ def parse_purchase_register(file_path_or_buffer, col_mapping, sheet_name=None, c
     if date_col and date_col in df_raw.columns:
         df['doc_date'] = df_raw[date_col].apply(parse_date)
     else:
-        df['doc_date'] = pd.NaT
+        raise ValueError("Invoice/Document Date column mapping is required.")
         
     # Map Supplier Name
     name_col = col_mapping.get('supplier_name')
@@ -744,8 +744,12 @@ def parse_purchase_register(file_path_or_buffer, col_mapping, sheet_name=None, c
         df['rchrg'] = 'No'
 
     # Map Monetary values
+    tx_val_col = col_mapping.get('taxable_val')
+    if not tx_val_col or tx_val_col not in df_raw.columns:
+        raise ValueError("Taxable Value column mapping is required.")
+        
     val_cols = {
-        'taxable_val': col_mapping.get('taxable_val'),
+        'taxable_val': tx_val_col,
         'igst': col_mapping.get('igst'),
         'cgst': col_mapping.get('cgst'),
         'sgst': col_mapping.get('sgst'),

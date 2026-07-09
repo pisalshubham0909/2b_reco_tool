@@ -613,21 +613,28 @@ if gstr2b_files:
             for idx, (field_id, label, is_required) in enumerate(fields_meta):
                 col_place = map_cols[idx % 3]
                 default_val = detected_maps.get(field_id)
-                default_idx = cols.index(default_val) if default_val in cols else 0
                 
                 with col_place:
                     sel = st.selectbox(
                         label,
-                        options=["[Not Selected]"] + cols if not is_required else cols,
-                        index=default_idx if is_required else (default_idx + 1 if default_val in cols else 0),
+                        options=["[Not Selected]"] + cols,
+                        index=cols.index(default_val) + 1 if default_val in cols else 0,
                         key=f"col_map_{field_id}"
                     )
                     if sel != "[Not Selected]":
                         col_mapping[field_id] = sel
                         
             if st.button("Load Purchase Register"):
-                try:
-                    books_dfs = []
+                missing_required = []
+                for f_id, f_label, f_req in fields_meta:
+                    if f_req and f_id not in col_mapping:
+                        missing_required.append(f_label.replace(" *", ""))
+                
+                if missing_required:
+                    st.error(f"⚠️ Please map the following required field(s): {', '.join(missing_required)}")
+                else:
+                    try:
+                        books_dfs = []
                     for file in books_files:
                         file.seek(0)
                         cur_sheet = selected_sheet
